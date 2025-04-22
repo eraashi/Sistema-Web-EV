@@ -3,10 +3,22 @@ from supabase import create_client
 from dotenv import load_dotenv
 import os
 from retrying import retry
+from flask_session import Session
 
 app = Flask(__name__)
 load_dotenv()
 app.secret_key = os.getenv('FLASK_SECRET_KEY')
+
+# Configurar o Flask-Session para usar o sistema de arquivos
+app.config['SESSION_TYPE'] = 'filesystem'
+app.config['SESSION_PERMANENT'] = True
+app.config['PERMANENT_SESSION_LIFETIME'] = 3600  # 1 hora
+app.config['SESSION_COOKIE_HTTPONLY'] = True
+app.config['SESSION_COOKIE_SAMESITE'] = 'Lax'
+app.config['SESSION_COOKIE_SECURE'] = False  # Alterar para True se usar HTTPS
+app.config['SESSION_FILE_DIR'] = os.path.join(os.getcwd(), 'flask_session')
+app.config['SESSION_COOKIE_DOMAIN'] = '127.0.0.1'  # Definir explicitamente o domínio
+Session(app)
 
 # Configurar Supabase
 supabase = create_client(os.getenv('SUPABASE_URL'), os.getenv('SUPABASE_ANON_KEY'))
@@ -26,9 +38,16 @@ def get_current_user():
         print("Nenhum user_id encontrado na sessão")
         return None
     try:
-        funcionario = execute_supabase_query(
-            supabase.table('funcionarios').select('*').eq('id', session['user_id']).single()
+        funcionarios = execute_supabase_query(
+            supabase.table('funcionarios').select('*').eq('id', session['user_id'])
         )
+        if not funcionarios or len(funcionarios) == 0:
+            print("Funcionário não encontrado para o user_id na sessão")
+            return None
+        if len(funcionarios) > 1:
+            print("Erro: Múltiplos funcionários encontrados para o mesmo user_id")
+            return None
+        funcionario = funcionarios[0]
         print(f"Funcionário encontrado: {funcionario}")
         return funcionario
     except Exception as e:
@@ -39,42 +58,54 @@ def get_current_user():
 def index():
     user = get_current_user()
     if user:
+        print(f"Usuário autenticado em /index, redirecionando para dashboard: {user['id']}")
         return redirect(url_for('dashboard'))
+    print("Nenhum usuário autenticado em /index, redirecionando para login")
     return redirect(url_for('login'))
 
 @app.route('/dashboard')
 def dashboard():
     user = get_current_user()
     if not user:
+        print("Nenhum usuário autenticado em /dashboard, redirecionando para login")
         return redirect(url_for('login'))
+    print(f"Usuário autenticado em /dashboard: {user['id']}")
     return render_template('dashboard.html', user=user)
 
 @app.route('/students')
 def students():
     user = get_current_user()
     if not user:
+        print("Nenhum usuário autenticado em /students, redirecionando para login")
         return redirect(url_for('login'))
+    print(f"Usuário autenticado em /students: {user['id']}")
     return render_template('student_list.html', user=user)
 
 @app.route('/reports')
 def reports():
     user = get_current_user()
     if not user:
+        print("Nenhum usuário autenticado em /reports, redirecionando para login")
         return redirect(url_for('login'))
+    print(f"Usuário autenticado em /reports: {user['id']}")
     return render_template('reports.html', user=user)
 
 @app.route('/classes')
 def classes():
     user = get_current_user()
     if not user:
+        print("Nenhum usuário autenticado em /classes, redirecionando para login")
         return redirect(url_for('login'))
+    print(f"Usuário autenticado em /classes: {user['id']}")
     return render_template('classes.html', user=user)
 
 @app.route('/new_class')
 def new_class():
     user = get_current_user()
     if not user:
+        print("Nenhum usuário autenticado em /new_class, redirecionando para login")
         return redirect(url_for('login'))
+    print(f"Usuário autenticado em /new_class: {user['id']}")
     return render_template('new_class.html', user=user)
 
 @app.route('/login', methods=['GET', 'POST'])
@@ -85,12 +116,16 @@ def login():
         password = data.get('password')
         print(f"Tentativa de login com CPF: {cpf}")
         try:
-            funcionario = execute_supabase_query(
-                supabase.table('funcionarios').select('*').eq('cpf', cpf).eq('senha', password).single()
+            funcionarios = execute_supabase_query(
+                supabase.table('funcionarios').select('*').eq('cpf', cpf).eq('senha', password)
             )
-            if not funcionario:
+            if not funcionarios or len(funcionarios) == 0:
                 print("Funcionário não encontrado ou senha incorreta")
                 return jsonify({'error': 'Invalid login credentials'}), 401
+            if len(funcionarios) > 1:
+                print("Erro: Múltiplos funcionários encontrados para o mesmo CPF e senha")
+                return jsonify({'error': 'Multiple users found'}), 400
+            funcionario = funcionarios[0]
             print(f"Funcionário autenticado: {funcionario['id']}")
             session['user_id'] = funcionario['id']
             print(f"Sessão atualizada: {session}")
@@ -294,6 +329,7 @@ def get_turmas():
 def manage_matriculas():
     user = get_current_user()
     if not user:
+        print("Erro: Usuário não autenticado em /api/matriculas")
         return jsonify({'error': 'Unauthorized'}), 401
     if request.method == 'GET':
         try:
@@ -348,13 +384,16 @@ def manage_matriculas():
 def enrollment():
     user = get_current_user()
     if not user:
+        print("Nenhum usuário autenticado em /enrollment, redirecionando para login")
         return redirect(url_for('login'))
+    print(f"Usuário autenticado em /enrollment: {user['id']}")
     return render_template('enrollment.html', user=user)
 
 @app.route('/api/matriculas/<id>', methods=['DELETE'])
 def delete_matricula(id):
     user = get_current_user()
     if not user:
+        print("Erro: Usuário não autenticado em /api/matriculas/<id>")
         return jsonify({'error': 'Unauthorized'}), 401
     try:
         matricula = supabase.table('matriculas').select('id, turma_id, turmas(polo_id)').eq('id', id).single().execute().data
@@ -368,6 +407,7 @@ def delete_matricula(id):
         supabase.table('matriculas').delete().eq('id', id).execute()
         return jsonify({'message': 'Matrícula removida com sucesso'})
     except Exception as e:
+        print(f"Erro em delete_matricula: {str(e)}")
         return jsonify({'error': str(e)}), 500
 
 if __name__ == '__main__':

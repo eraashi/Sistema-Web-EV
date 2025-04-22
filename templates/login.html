@@ -33,17 +33,20 @@
                 const response = await fetch('/login', {
                     method: 'POST',
                     headers: { 'Content-Type': 'application/json' },
-                    body: JSON.stringify({ cpf, password })
+                    body: JSON.stringify({ cpf, password }),
+                    credentials: 'include'  // Adicionar para enviar cookies de sessão
                 });
                 const data = await response.json();
 
                 if (response.ok) {
-                    // Redireciona para a URL fornecida no JSON de resposta
+                    console.log('Login bem-sucedido, redirecionando para:', data.redirect || '/dashboard');
                     window.location.href = data.redirect || '/dashboard';
                 } else {
+                    console.log('Erro ao fazer login:', data.error || 'Erro desconhecido');
                     alert(data.error || 'Erro ao fazer login');
                 }
             } catch (error) {
+                console.log('Erro na requisição de login:', error.message);
                 alert('Erro: ' + error.message);
             }
         });
