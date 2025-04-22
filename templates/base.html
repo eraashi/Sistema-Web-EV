@@ -1,0 +1,84 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>{% block title %}{% endblock %} - Escola Viva</title>
+    <!-- Adicionando um parâmetro de versão para evitar cache -->
+    <link href="/static/css/output.css?v=1" rel="stylesheet">
+    <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+    <script src="https://unpkg.com/lucide@latest"></script>
+    <script>
+        document.addEventListener('DOMContentLoaded', () => {
+            lucide.createIcons();
+        });
+    </script>
+</head>
+<body class="bg-gray-100 font-sans">
+    <div class="flex min-h-screen">
+        <!-- Sidebar -->
+        <div class="w-64 bg-blue-800 text-white flex flex-col">
+            <div class="p-4 text-2xl font-bold">Escola Viva</div>
+            <nav class="flex-1">
+                <a href="/dashboard" class="flex items-center p-4 hover:bg-blue-700 {% if request.path == '/dashboard' %}bg-blue-700{% endif %}">
+                    <svg class="h-5 w-5 mr-2" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M3 12l2-2m0 0l7-7 7 7M5 10v10a1 1 0 001 1h3m10-11l2 2m-2-2v10a1 1 0 01-1 1h-3m-6 0a1 1 0 001-1v-4a1 1 0 011-1h2a1 1 0 011 1v4a1 1 0 001 1m-6 0h6"/>
+                    </svg>
+                    Dashboard
+                </a>
+                <a href="/students" class="flex items-center p-4 hover:bg-blue-700 {% if request.path == '/students' %}bg-blue-700{% endif %}">
+                    <svg class="h-5 w-5 mr-2" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M16 7a4 4 0 11-8 0 4 4 0 018 0zM12 14a7 7 0 00-7 7h14a7 7 0 00-7-7z"/>
+                    </svg>
+                    Alunos
+                </a>
+                <a href="/classes" class="flex items-center p-4 hover:bg-blue-700 {% if request.path == '/classes' %}bg-blue-700{% endif %}">
+                    <svg class="h-5 w-5 mr-2" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 6.253v13m0-13C10.832 5.477 9.246 5 7.5 5S4.168 5.477 3 6.253v13C4.168 18.477 5.754 18 7.5 18s3.332.477 4.5 1.253m0-13C13.168 5.477 14.754 5 16.5 5c1.747 0 3.332.477 4.5 1.253v13C19.832 18.477 18.247 18 16.5 18c-1.746 0-3.332.477-4.5 1.253"/>
+                    </svg>
+                    Turmas
+                </a>
+                <a href="/enrollment" class="flex items-center p-4 hover:bg-blue-700 {% if request.path == '/enrollment' %}bg-blue-700{% endif %}">
+                    <svg class="h-5 w-5 mr-2" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 5H7a2 2 0 00-2 2v12a2 2 0 002 2h10a2 2 0 002-2V7a2 2 0 00-2-2h-2M9 5a2 2 0 002 2h2a2 2 0 002-2M9 5a2 2 0 012-2h2a2 2 0 012 2"/>
+                    </svg>
+                    Enturmar Alunos
+                </a>
+                <a href="/reports" class="flex items-center p-4 hover:bg-blue-700 {% if request.path == '/reports' %}bg-blue-700{% endif %}">
+                    <svg class="h-5 w-5 mr-2" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 5H7a2 2 0 00-2 2v12a2 2 0 002 2h10a2 2 0 002-2V7a2 2 0 00-2-2h-2M9 5a2 2 0 002 2h2a2 2 0 002-2M9 5a2 2 0 012-2h2a2 2 0 012 2"/>
+                    </svg>
+                    Relatórios
+                </a>
+            </nav>
+            <div class="p-4 text-sm">Usuário: {{ user.nome if user else 'Admin' }}</div>
+        </div>
+        <!-- Main Content -->
+        <div class="flex-1 flex flex-col">
+            <header class="bg-white shadow-sm p-4 flex justify-between items-center">
+                <h1 class="text-xl font-semibold">{% block header %}{% endblock %}</h1>
+                <div class="flex items-center space-x-2">
+                    <span>Olá, {{ user.nome if user else 'Admin' }}</span>
+                    <button onclick="logout()" class="bg-blue-500 text-white px-3 py-1 rounded-md hover:bg-blue-600">Sair</button>
+                </div>
+            </header>
+            <main class="flex-1 p-6">
+                {% block content %}{% endblock %}
+            </main>
+        </div>
+    </div>
+    <!-- Custom Toast Container -->
+    <div id="custom-toast-container" class="fixed bottom-4 right-4 z-[10000] flex flex-col space-y-2">
+        <!-- Toasts will be dynamically added here -->
+    </div>
+
+    <script>
+        function logout() {
+            fetch('/logout', { method: 'POST' })
+                .then(() => window.location.href = '/login')
+                .catch(error => alert('Erro: ' + error.message));
+        }
+    </script>
+    {% block scripts %}{% endblock %}
+</body>
+</html>

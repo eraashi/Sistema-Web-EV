@@ -1,0 +1,59 @@
+{% extends 'base.html' %}
+
+{% block title %}Dashboard{% endblock %}
+
+{% block header %}Dashboard{% endblock %}
+
+{% block content %}
+<div class="mb-6 px-6">
+    <h2 class="text-lg font-semibold mb-4">Visão Geral do Programa Escola Viva</h2>
+</div>
+<div class="grid grid-cols-1 md:grid-cols-4 gap-6 mb-6 px-6">
+    <div class="border border-blue-400 rounded-lg shadow-md p-4">
+        <div class="flex items-center mb-2">
+            <i data-lucide="users" class="h-6 w-6 text-blue-600 mr-2"></i>
+            <h3 class="text-sm font-medium text-gray-500">Total de Alunos</h3>
+        </div>
+        <p id="total-students" class="text-2xl font-bold">0</p>
+    </div>
+    <div class="border border-blue-400 rounded-lg shadow-md p-4">
+        <div class="flex items-center mb-2">
+            <i data-lucide="briefcase" class="h-6 w-6 text-orange-600 mr-2"></i>
+            <h3 class="text-sm font-medium text-gray-500">Turmas Ativas</h3>
+        </div>
+        <p id="total-classes" class="text-2xl font-bold">0</p>
+        <p id="avg-capacity" class="text-sm text-gray-500">Capacidade média: 0 alunos</p>
+    </div>
+    <div class="border border-blue-400 rounded-lg shadow-md p-4">
+        <div class="flex items-center mb-2">
+            <i data-lucide="brain" class="h-6 w-6 text-green-600 mr-2"></i>
+            <h3 class="text-sm font-medium text-gray-500">Disciplinas Cognitivas</h3>
+        </div>
+        <p id="cognitive-classes" class="text-2xl font-bold">0</p>
+    </div>
+    <div class="border border-blue-400 rounded-lg shadow-md p-4">
+        <div class="flex items-center mb-2">
+            <i data-lucide="fast-forward" class="h-6 w-6 text-purple-600 mr-2"></i>
+            <h3 class="text-sm font-medium text-gray-500">Disciplinas Motoras</h3>
+        </div>
+        <p id="motor-classes" class="text-2xl font-bold">0</p>
+    </div>
+</div>
+<div class="bg-white border border-blue-400 rounded-lg shadow-md p-4 px-6">
+    <h3 class="text-lg font-semibold mb-4">Ocupação das Turmas</h3>
+    <div class="grid grid-cols-1 md:grid-cols-2 gap-6">
+        <div>
+            <p class="text-sm font-medium text-gray-500 mb-2">Disciplinas Cognitivas</p>
+            <p id="cognitive-occupancy" class="text-gray-500">Nenhuma disciplina cognitiva cadastrada</p>
+        </div>
+        <div>
+            <p class="text-sm font-medium text-gray-500 mb-2">Disciplinas Motoras</p>
+            <p id="motor-occupancy" class="text-gray-500">Nenhuma disciplina motora cadastrada</p>
+        </div>
+    </div>
+</div>
+{% endblock %}
+
+{% block scripts %}
+<script src="/static/js/dashboard.js"></script>
+{% endblock %}

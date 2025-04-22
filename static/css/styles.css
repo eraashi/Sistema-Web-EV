@@ -1,0 +1,230 @@
+/* Importar Tailwind CSS */
+@import 'tailwindcss/base';
+@import 'tailwindcss/components';
+@import 'tailwindcss/utilities';
+
+/* Definir fonte padrão */
+body {
+    font-family: 'Inter', sans-serif;
+}
+
+/* Estilizar a Sidebar */
+.sidebar {
+    width: 16rem; /* 256px, equivalente ao w-64 do Tailwind */
+    background-color: #1E3A8A; /* Azul escuro da sidebar nas imagens */
+    color: white;
+    display: flex;
+    flex-direction: column;
+    height: 100vh;
+    position: fixed;
+    top: 0;
+    left: 0;
+}
+
+/* Estilizar o contêiner principal para colar ao sidebar */
+.container {
+    margin-left: 16rem; /* Espaço para a sidebar */
+}
+
+/* Estilizar o Header */
+header {
+    background-color: white;
+    box-shadow: 0 1px 3px rgba(0, 0, 0, 0.1);
+    padding: 1rem;
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+}
+
+/* Estilizar o Conteúdo Principal */
+main {
+    padding: 1.5rem;
+    flex: 1;
+}
+
+/* Estilizar Cards */
+.card {
+    background-color: white;
+    padding: 1rem;
+    border-radius: 0.5rem;
+    box-shadow: 0 1px 3px rgba(0, 0, 0, 0.1);
+}
+
+.card h3 {
+    font-size: 0.875rem;
+    font-weight: 500;
+    color: #6B7280; /* Cinza para títulos */
+}
+
+.card p {
+    font-size: 1.5rem;
+    font-weight: 700;
+}
+
+.card p.text-sm {
+    font-size: 0.875rem;
+    color: #6B7280;
+}
+
+/* Estilizar Ícones nos Cards */
+.card [data-lucide] {
+    height: 1.5rem; /* 24px, equivalente a h-6 */
+    width: 1.5rem; /* 24px, equivalente a w-6 */
+}
+
+/* Estilizar Seção de Ocupação das Turmas */
+.occupancy-section {
+    background-color: white;
+    border-radius: 0.5rem;
+    box-shadow: 0 1px 3px rgba(0, 0, 0, 0.1);
+    padding: 1rem;
+}
+
+.occupancy-section h3 {
+    font-size: 1.125rem;
+    font-weight: 600;
+    margin-bottom: 1rem;
+}
+
+.occupancy-section p {
+    font-size: 0.875rem;
+    color: #6B7280;
+}
+
+/* Estilizar Tabelas */
+table {
+    width: 100%;
+    border-collapse: collapse;
+}
+
+thead {
+    background-color: #F9FAFB; /* Cinza claro para cabeçalho */
+}
+
+th, td {
+    padding: 0.75rem 1.5rem;
+    text-align: left;
+}
+
+th {
+    font-size: 0.75rem;
+    font-weight: 500;
+    color: #6B7280;
+    text-transform: uppercase;
+}
+
+tr {
+    border-bottom: 1px solid #E5E7EB;
+}
+
+/* Estilizar Inputs e Botões */
+input, select {
+    border: 1px solid #D1D5DB;
+    border-radius: 0.375rem;
+    padding: 0.5rem 0.75rem;
+    width: 100%;
+    transition: border-color 0.2s;
+}
+
+input:focus, select:focus {
+    border-color: #1E3A8A;
+    outline: none;
+    box-shadow: 0 0 0 2px rgba(30, 58, 138, 0.1);
+}
+
+button {
+    transition: background-color 0.2s;
+}
+
+button.bg-blue-600:hover {
+    background-color: #1E40AF;
+}
+
+button.bg-gray-200:hover {
+    background-color: #D1D5DB;
+}
+
+/* Estilizar Etapas (Steps) */
+.step {
+    display: flex;
+    align-items: center;
+}
+
+.step-circle {
+    height: 2rem;
+    width: 2rem;
+    border-radius: 9999px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    color: white;
+}
+
+.step-line {
+    flex: 1;
+    height: 0.25rem;
+    margin: 0 0.5rem;
+}
+
+.step-line.bg-gray-300 {
+    background-color: #D1D5DB;
+}
+
+.step-line.bg-green-500 {
+    background-color: #10B981;
+}
+
+/* Estilizar Badges */
+.badge {
+    display: inline-flex;
+    padding: 0.25rem 0.5rem;
+    border-radius: 9999px;
+    font-size: 0.75rem;
+    font-weight: 500;
+}
+
+.badge-complete {
+    background-color: #D1FAE5;
+    color: #059669;
+}
+
+.badge-partial {
+    background-color: #FEF3C7;
+    color: #D97706;
+}
+
+.badge-pending {
+    background-color: #FEE2E2;
+    color: #EF4444;
+}
+
+/* Estilizar Progress Bars */
+.progress-bar {
+    width: 100%;
+    background-color: #E5E7EB;
+    border-radius: 9999px;
+    height: 0.625rem;
+}
+
+.progress-bar-fill {
+    background-color: #1E3A8A;
+    height: 0.625rem;
+    border-radius: 9999px;
+}
+
+/* Responsividade */
+@media (max-width: 768px) {
+    .sidebar {
+        width: 100%;
+        height: auto;
+        position: relative;
+    }
+
+    .container {
+        margin-left: 0;
+    }
+
+    .sidebar-nav a {
+        padding: 0.75rem;
+    }
+}

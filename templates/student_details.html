@@ -1,0 +1,33 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Detalhes do Aluno - Escola Viva</title>
+    <link href="/static/css/output.css" rel="stylesheet">
+</head>
+<body class="bg-gray-100">
+    <div class="container mx-auto px-4 py-8">
+        <h1 class="text-2xl font-bold mb-6">Detalhes do Aluno</h1>
+        <div class="bg-white p-6 rounded-lg shadow-md">
+            <h2 class="text-xl font-semibold mb-4">{{ student.nome }}</h2>
+            <p class="text-gray-600 mb-2"><strong>ID:</strong> {{ student.id }}</p>
+            <p class="text-gray-600 mb-2"><strong>Matrícula:</strong> {{ student.matricula }}</p>
+            <p class="text-gray-600 mb-4"><strong>Série:</strong> {{ student.serie }}º Ano</p>
+            <h3 class="text-lg font-semibold mb-2">Matrículas</h3>
+            {% if student.matriculas %}
+                <ul class="list-disc pl-5">
+                    {% for matricula in student.matriculas %}
+                        <li class="text-gray-600">{{ matricula.turmas.disciplinas.tipo | capitalize }}: {{ matricula.turmas.nome }} ({{ matricula.turmas.disciplinas.tipo }})</li>
+                    {% endfor %}
+                </ul>
+            {% else %}
+                <p class="text-gray-500">Nenhuma matrícula registrada.</p>
+            {% endif %}
+            <div class="mt-6 flex justify-end">
+                <button onclick="window.history.back()" class="bg-blue-600 text-white px-4 py-2 rounded-md hover:bg-blue-700">Voltar</button>
+            </div>
+        </div>
+    </div>
+</body>
+</html>

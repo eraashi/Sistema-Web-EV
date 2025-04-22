@@ -1,0 +1,345 @@
+{% extends 'base.html' %}
+
+{% block title %}Enturmar Alunos{% endblock %}
+
+{% block header %}Gerenciamento de Matrículas{% endblock %}
+
+{% block content %}
+<div class="px-6" style="box-sizing: border-box; max-width: 100vw; overflow-x: hidden;">
+    <div class="flex flex-row gap-6 mb-6 md:flex-col">
+        <!-- Primeira Div: Lista de Turmas -->
+        <div class="border border-blue-400 rounded-lg p-6 bg-white md:w-full" style="flex: 1; min-width: 0; height: calc(100vh - 120px);">
+            <h2 class="text-lg font-semibold mb-4" style="height: 32px;">Turmas - Selecione uma turma</h2>
+            <div style="height: 160px; margin-bottom: 16px;">
+                <div class="flex space-x-2 mb-4" style="height: 40px;">
+                    <button id="filter-cognitiva" class="bg-blue-600 text-white px-4 py-2 rounded-md hover:bg-blue-700 flex-1">Cognitivas</button>
+                    <button id="filter-motora" class="bg-gray-200 text-gray-700 px-4 py-2 rounded-md hover:bg-gray-300 flex-1">Motoras</button>
+                </div>
+                <div class="relative mb-4" style="height: 40px;">
+                    <input
+                        id="class-search"
+                        type="text"
+                        placeholder="Buscar turmas..."
+                        class="w-full p-2 pl-10 border border-gray-300 rounded-md shadow-sm focus:outline-none focus:ring-blue-500 focus:border-blue-500"
+                    >
+                    <i data-lucide="search" class="absolute left-3 top-1/2 -translate-y-1/2 h-5 w-5 text-gray-400"></i>
+                </div>
+                <div class="flex gap-4" style="height: 40px;">
+                    <select id="day-filter" class="w-full px-3 py-2 border border-gray-300 rounded-md shadow-sm focus:outline-none focus:ring-blue-500 focus:border-blue-500">
+                        <option value="">TODAS</option>
+                        <option value="seg">Segunda</option>
+                        <option value="ter">Terça</option>
+                        <option value="qua">Quarta</option>
+                        <option value="qui">Quinta</option>
+                        <option value="sex">Sexta</option>
+                    </select>
+                    <select id="period-filter" class="w-full px-3 py-2 border border-gray-300 rounded-md shadow-sm focus:outline-none focus:ring-blue-500 focus:border-blue-500">
+                        <option value="">TODOS</option>
+                        <option value="manha">Manhã</option>
+                        <option value="tarde">Tarde</option>
+                    </select>
+                </div>
+            </div>
+            <div id="class-list" style="height: calc(100% - 208px); overflow-y: auto;">
+                <div class="text-center py-4 text-gray-500">Carregando turmas...</div>
+            </div>
+        </div>
+
+        <!-- Segunda Div: Turma Selecionada e Alunos Matriculados -->
+        <div class="border border-blue-400 rounded-lg p-6 bg-white md:w-full" style="flex: 1; min-width: 0; height: calc(100vh - 120px); display: flex; flex-direction: column; overflow: hidden;">
+            <div class="flex justify-between items-center mb-4" style="height: 32px; flex-shrink: 0;">
+                <h3 id="selected-class-title" class="text-lg font-semibold">Nenhuma turma selecionada</h3>
+                <button id="close-selected-class" class="text-blue-600 hover:text-blue-800 hidden">
+                    <i data-lucide="x" class="h-5 w-5"></i>
+                </button>
+            </div>
+            <div id="selected-class-details" class="text-sm text-gray-600 mb-4 flex-shrink-0" style="max-height: 200px; overflow-y: auto;">
+                <p>Selecione uma turma para visualizar os detalhes.</p>
+            </div>
+            <hr class="separator flex-shrink-0">
+            <div id="enrolled-students-wrapper" class="hidden flex flex-col">
+                <h3 class="text-lg font-semibold mb-4" style="height: 32px; flex-shrink: 0;">Alunos Matriculados</h3>
+                <div id="enrolled-students" style="height: calc(100vh - 496px); min-height: 200px; overflow-y: auto; flex-shrink: 0;">
+                    <div class="text-center py-4 text-gray-500">Nenhuma turma selecionada.</div>
+                </div>
+            </div>
+        </div>
+
+        <!-- Terceira Div: Alunos Disponíveis -->
+        <div class="border border-blue-400 rounded-lg p-6 bg-white md:w-full" style="flex: 1; min-width: 0; height: calc(100vh - 120px);">
+            <h3 class="text-lg font-semibold mb-4" style="height: 32px;">Alunos Disponíveis</h3>
+            <div class="relative mb-4" style="height: 40px;">
+                <input
+                    id="student-search-available"
+                    type="text"
+                    placeholder="Buscar alunos..."
+                    class="w-full p-2 pl-10 border border-gray-300 rounded-md shadow-sm focus:outline-none focus:ring-blue-500 focus:border-blue-500"
+                    disabled
+                >
+                <i data-lucide="search" class="absolute left-3 top-1/2 -translate-y-1/2 h-5 w-5 text-gray-400"></i>
+            </div>
+            <div id="available-students" style="height: calc(100% - 112px); overflow-y: auto;">
+                <div class="text-center py-4 text-gray-500">Nenhuma turma selecionada.</div>
+            </div>
+        </div>
+    </div>
+</div>
+
+<style>
+    /* Toast Animation */
+    @keyframes fadeInOut {
+        0% { opacity: 0; transform: translateY(10px); }
+        10% { opacity: 1; transform: translateY(0); }
+        90% { opacity: 1; transform: translateY(0); }
+        100% { opacity: 0; transform: translateY(10px); }
+    }
+
+    /* Toast Container */
+    #custom-toast-container {
+        position: fixed !important;
+        bottom: 16px !important;
+        right: 16px !important;
+        z-index: 10000 !important;
+        display: flex !important;
+        flex-direction: column !important;
+        gap: 8px !important;
+    }
+
+    /* Toast Styles */
+    #custom-toast-container .custom-toast {
+        display: flex !important;
+        align-items: center !important;
+        justify-content: space-between !important;
+        min-width: 200px !important;
+        padding: 6px 10px !important;
+        border-radius: 6px !important;
+        box-shadow: 0 2px 4px rgba(0, 0, 0, 0.1) !important;
+        color: white !important;
+        font-size: 13px !important;
+        animation: fadeInOut 3s ease-in-out forwards !important;
+        line-height: 1.2 !important;
+    }
+
+    #custom-toast-container .custom-toast-success {
+        background-color: #22c55e !important;
+    }
+
+    #custom-toast-container .custom-toast-error {
+        background-color: #ef4444 !important;
+    }
+
+    #custom-toast-container .custom-toast-icon {
+        margin-right: 6px !important;
+        flex-shrink: 0 !important;
+    }
+
+    #custom-toast-container .custom-toast-message {
+        flex: 1 !important;
+        overflow: hidden !important;
+        text-overflow: ellipsis !important;
+        white-space: nowrap !important;
+    }
+
+    #custom-toast-container .custom-toast-close {
+        background: none !important;
+        border: none !important;
+        color: white !important;
+        font-size: 16px !important;
+        cursor: pointer !important;
+        padding: 0 6px !important;
+        flex-shrink: 0 !important;
+    }
+
+    /* Reset para evitar estilos indesejados do Tailwind nos botões Matricular */
+    #available-students button {
+        all: unset;
+        display: inline-flex !important;
+        align-items: center !important;
+        justify-content: center !important;
+        padding: 0.25rem 0.75rem !important;
+        border-radius: 0.375rem !important;
+        cursor: pointer !important;
+        background-color: #2563eb !important;
+        color: #ffffff !important;
+        transition: background-color 0.2s ease-in-out !important;
+    }
+
+    #available-students button.bg-blue-600 {
+        background-color: #2563eb !important;
+        color: #ffffff !important;
+    }
+
+    #available-students button.bg-blue-600:hover {
+        background-color: #1d4ed8 !important;
+    }
+
+    #available-students button.bg-blue-600:disabled,
+    #available-students button.bg-blue-600[disabled] {
+        background-color: #2563eb !important;
+        color: #ffffff !important;
+        opacity: 1 !important;
+        cursor: pointer !important;
+    }
+
+    #enrolled-students .bg-red-600 {
+        background-color: #dc2626 !important;
+        color: #ffffff !important;
+    }
+
+    #enrolled-students .bg-red-600:hover {
+        background-color: #b91c1c !important;
+    }
+
+    #enrolled-students .bg-red-600 i {
+        color: #ffffff !important;
+    }
+
+    /* Estilização da div do meio (Turma Selecionada) */
+    #selected-class-title {
+        display: flex;
+        align-items: center;
+        gap: 8px;
+        font-size: 18px;
+        font-weight: 600;
+        color: #1f2937;
+    }
+
+    #selected-class-title .class-type-tag {
+        display: inline-block;
+        padding: 1px 6px;
+        border-radius: 9999px;
+        font-size: 12px;
+        font-weight: 500;
+        color: #ffffff;
+        transition: opacity 0.2s ease-in-out;
+    }
+
+    #selected-class-title .class-type-tag:hover {
+        opacity: 0.8;
+    }
+
+    #selected-class-title .class-type-tag.cognitiva {
+        background-color: #86efac;
+    }
+
+    #selected-class-title .class-type-tag.motora {
+        background-color: #d8b4fe;
+    }
+
+    #selected-class-details {
+        display: flex;
+        flex-direction: column;
+        gap: 12px;
+        color: #4b5563;
+        flex-shrink: 0;
+    }
+
+    #selected-class-details .detail-item {
+        display: flex;
+        align-items: center;
+        gap: 8px;
+        width: 100%;
+    }
+
+    #selected-class-details .detail-item i {
+        width: 20px;
+        height: 20px;
+        color: #6b7280;
+        flex-shrink: 0;
+    }
+
+    #selected-class-details .detail-item span {
+        font-size: 14px;
+        flex: 1;
+    }
+
+    /* Separador entre dados da turma e alunos matriculados */
+    hr.separator {
+        border: none;
+        border-top: 2px solid #93c5fd;
+        margin: 16px auto;
+        width: 100%;
+        max-width: 100%;
+    }
+
+    /* Garantir que o separador seja visível apenas quando #enrolled-students-wrapper não estiver escondido */
+    #enrolled-students-wrapper.hidden + hr.separator {
+        display: none;
+    }
+
+    /* Estilização dos detalhes na lista de turmas (primeiro div) */
+    #class-list .class-item-details {
+        display: flex;
+        flex-direction: column;
+        gap: 4px;
+        color: #6b7280;
+    }
+
+    #class-list .class-item-details p {
+        font-size: 14px;
+        margin: 0;
+    }
+
+    /* Estilização da tag de tipo na lista de turmas */
+    #class-list .class-type-tag {
+        display: inline-block;
+        padding: 1px 6px;
+        border-radius: 9999px;
+        font-size: 12px;
+        font-weight: 500;
+        color: #ffffff;
+        margin-left: 8px;
+    }
+
+    #class-list .class-type-tag.cognitiva {
+        background-color: #86efac;
+    }
+
+    #class-list .class-type-tag.motora {
+        background-color: #d8b4fe;
+    }
+
+    /* Estilização para garantir consistência no scroll */
+    #class-list, #enrolled-students, #available-students {
+        scrollbar-width: thin;
+        scrollbar-color: #93c5fd #e5e7eb;
+    }
+
+    #class-list::-webkit-scrollbar, #enrolled-students::-webkit-scrollbar, #available-students::-webkit-scrollbar {
+        width: 8px;
+    }
+
+    #class-list::-webkit-scrollbar-track, #enrolled-students::-webkit-scrollbar-track, #available-students::-webkit-scrollbar-track {
+        background: #e5e7eb;
+        border-radius: 4px;
+    }
+
+    #class-list::-webkit-scrollbar-thumb, #enrolled-students::-webkit-scrollbar-thumb, #available-students::-webkit-scrollbar-thumb {
+        background: #93c5fd;
+        border-radius: 4px;
+    }
+
+    #class-list::-webkit-scrollbar-thumb:hover, #enrolled-students::-webkit-scrollbar-thumb:hover, #available-students::-webkit-scrollbar-thumb:hover {
+        background: #2563eb;
+    }
+</style>
+
+<style>
+    .bg-red-600 {
+        background-color: #dc2626 !important;
+        font-size: 14px;
+        padding: 8px 16px;
+    }
+    .bg-red-600:hover {
+        background-color: #b91c1c !important;
+    }
+</style>
+{% endblock %}
+
+{% block scripts %}
+<script src="https://unpkg.com/lucide@latest"></script>
+<script src="/static/js/enrollment.js"></script>
+<script>
+    document.addEventListener('DOMContentLoaded', loadData);
+</script>
+{% endblock %}

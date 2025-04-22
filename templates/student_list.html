@@ -1,0 +1,127 @@
+{% extends 'base.html' %}
+
+{% block title %}Pesquisa de Alunos{% endblock %}
+
+{% block header %}Pesquisa de Alunos{% endblock %}
+
+{% block content %}
+<div class="mb-6 px-6">
+    <h2 class="text-lg font-semibold mb-4">
+        {% if user.cargo in ['admin', 'secretaria'] %}
+            Pesquise todos os alunos
+        {% elif user.cargo in ['diretor', 'monitor'] %}
+            Pesquise os alunos da sua unidade
+        {% else %}
+            Pesquise os alunos do seu Polo
+        {% endif %}
+    </h2>
+    <!-- Contorno azul para os filtros -->
+    <div class="border border-blue-400 rounded-lg p-6 mb-6 bg-white">
+        <form id="filter-form" class="flex flex-wrap gap-6 items-end">
+            <div class="flex-1 min-w-[300px]">
+                <label for="nome" class="block text-sm font-medium text-gray-700">Nome</label>
+                <input type="text" id="nome" name="nome" class="mt-1 block w-full px-3 py-2 border border-gray-300 rounded-md shadow-sm focus:outline-none focus:ring-blue-500 focus:border-blue-500" placeholder="Digite o nome">
+            </div>
+            <div class="flex-1 min-w-[150px]">
+                <label for="matricula" class="block text-sm font-medium text-gray-700">Matrícula</label>
+                <input type="text" id="matricula" name="matricula" class="mt-1 block w-full px-3 py-2 border border-gray-300 rounded-md shadow-sm focus:outline-none focus:ring-blue-500 focus:border-blue-500" placeholder="Digite a matrícula">
+            </div>
+            {% if user.cargo in ['admin', 'secretaria'] %}
+                <div class="flex-1 min-w-[200px]">
+                    <label for="polo_name" class="block text-sm font-medium text-gray-700">Polo</label>
+                    <select id="polo_name" name="polo_name" class="mt-1 block w-full px-3 py-2 border border-gray-300 rounded-md shadow-sm focus:outline-none focus:ring-blue-500 focus:border-blue-500">
+                        <option value="tudo">Tudo</option>
+                        <option value="POLO I (Porto da Roça)">POLO I (Porto da Roça)</option>
+                        <option value="POLO II (Sampaio Correia)">POLO II (Sampaio Correia)</option>
+                        <option value="Polo III (Jaconé)">Polo III (Jaconé)</option>
+                        <option value="Polo IV (Saquarema)">Polo IV (Saquarema)</option>
+                    </select>
+                </div>
+            {% endif %}
+            <div class="flex-1 min-w-[200px]">
+                <label for="turma_unidade" class="block text-sm font-medium text-gray-700">Turma/Unidade</label>
+                <input type="text" id="turma_unidade" name="turma_unidade" class="mt-1 block w-full px-3 py-2 border border-gray-300 rounded-md shadow-sm focus:outline-none focus:ring-blue-500 focus:border-blue-500" placeholder="Digite a turma/unidade">
+            </div>
+            <div class="flex-1 min-w-[150px]">
+                <label for="genero" class="block text-sm font-medium text-gray-700">Gênero</label>
+                <select id="genero" name="genero" class="mt-1 block w-full px-3 py-2 border border-gray-300 rounded-md shadow-sm focus:outline-none focus:ring-blue-500 focus:border-blue-500">
+                    <option value="tudo">Tudo</option>
+                    <option value="Masculino">Masculino</option>
+                    <option value="Feminino">Feminino</option>
+                    <option value="Outro">Outro</option>
+                </select>
+            </div>
+            <div class="flex-1 min-w-[150px]">
+                <label for="pcd" class="block text-sm font-medium text-gray-700">PCD</label>
+                <select id="pcd" name="pcd" class="mt-1 block w-full px-3 py-2 border border-gray-300 rounded-md shadow-sm focus:outline-none focus:ring-blue-500 focus:border-blue-500">
+                    <option value="tudo">Tudo</option>
+                    <option value="Com Deficiência">Com Deficiência</option>
+                    <option value="Sem Deficiência">Sem Deficiência</option>
+                </select>
+            </div>
+            {% if user.cargo in ['admin', 'secretaria', 'coordenador'] %}
+                <div class="flex-1 min-w-[300px]">
+                    <label for="unidade" class="block text-sm font-medium text-gray-700">Unidade</label>
+                    <input type="text" id="unidade" name="unidade" class="mt-1 block w-full px-3 py-2 border border-gray-300 rounded-md shadow-sm focus:outline-none focus:ring-blue-500 focus:border-blue-500" placeholder="Digite a unidade">
+                </div>
+            {% endif %}
+            <div class="flex-1 min-w-[150px]">
+                <label for="etapa" class="block text-sm font-medium text-gray-700">Etapa</label>
+                <select id="etapa" name="etapa" class="mt-1 block w-full px-3 py-2 border border-gray-300 rounded-md shadow-sm focus:outline-none focus:ring-blue-500 focus:border-blue-500">
+                    <option value="tudo">Tudo</option>
+                    <option value="4">4</option>
+                    <option value="5">5</option>
+                    <option value="6">6</option>
+                    <option value="7">7</option>
+                    <option value="8">8</option>
+                    <option value="9">9</option>
+                </select>
+            </div>
+            <div class="flex-1 min-w-[150px]">
+                <label for="status" class="block text-sm font-medium text-gray-700">Status</label>
+                <select id="status" name="status" class="mt-1 block w-full px-3 py-2 border border-gray-300 rounded-md shadow-sm focus:outline-none focus:ring-blue-500 focus:border-blue-500">
+                    <option value="tudo">Tudo</option>
+                    <option value="complete">Completo</option>
+                    <option value="partial">Parcial</option>
+                    <option value="pending">Pendente</option>
+                </select>
+            </div>
+        </form>
+    </div>
+
+    <!-- Botão Pesquisar centralizado -->
+    <div class="flex justify-center mb-6">
+        <button type="submit" form="filter-form" class="bg-blue-600 text-white px-6 py-2 rounded-md hover:bg-blue-700 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:ring-opacity-50">Pesquisar</button>
+    </div>
+
+    <!-- Contorno azul para os resultados -->
+    <div class="border border-blue-400 rounded-lg bg-white">
+        <!-- Controle de paginação no topo -->
+        <div id="pagination-top" class="py-4 px-6"></div>
+        <table class="min-w-full divide-y divide-gray-200">
+            <thead class="bg-gray-50">
+                <tr>
+                    <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">Nome</th>
+                    <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">Matrícula</th>
+                    <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">Polo</th>
+                    <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">Turma/Unidade</th>
+                    <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">Gênero</th>
+                    <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">PCD</th>
+                    <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">Unidade</th>
+                    <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">Etapa</th>
+                    <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">Status</th>
+                </tr>
+            </thead>
+            <tbody id="student-table-body" class="divide-y divide-gray-200">
+                <tr><td colspan="9" class="px-6 py-4 text-center text-gray-500">Ajuste os filtros e clique em "Pesquisar" para listar os alunos.</td></tr>
+            </tbody>
+        </table>
+        <!-- Controle de paginação no final -->
+        <div id="pagination" class="py-4 px-6"></div>
+    </div>
+</div>
+{% endblock %}
+
+{% block scripts %}
+<script src="/static/js/student_list.js"></script>
+{% endblock %}

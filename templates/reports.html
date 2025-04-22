@@ -1,0 +1,102 @@
+{% extends 'base.html' %}
+
+{% block title %}Relatórios{% endblock %}
+
+{% block header %}Relatórios{% endblock %}
+
+{% block content %}
+<div class="mb-6">
+    <h2 class="text-lg font-semibold mb-4">Análises e Estatísticas do Programa Escola Viva</h2>
+    <div class="flex space-x-2">
+        <button onclick="showTab('disciplinas')" class="bg-blue-600 text-white px-4 py-2 rounded-md hover:bg-blue-700">Distribuição por Disciplina</button>
+        <button onclick="showTab('dias')" class="bg-gray-200 text-gray-700 px-4 py-2 rounded-md hover:bg-gray-300">Distribuição por Dias da Semana</button>
+        <button onclick="showTab('taxa')" class="bg-gray-200 text-gray-700 px-4 py-2 rounded-md hover:bg-gray-300">Taxa de Ocupação Geral</button>
+    </div>
+</div>
+<div id="disciplinas-tab" class="bg-white p-4 rounded-lg shadow-md">
+    <h3 class="text-lg font-semibold mb-4">Distribuição por Disciplina</h3>
+    <canvas id="discipline-distribution-chart"></canvas>
+</div>
+<div id="dias-tab" class="bg-white p-4 rounded-lg shadow-md hidden">
+    <h3 class="text-lg font-semibold mb-4">Distribuição por Dias da Semana</h3>
+    <canvas id="day-distribution-chart"></canvas>
+</div>
+<div id="taxa-tab" class="bg-white p-4 rounded-lg shadow-md hidden">
+    <h3 class="text-lg font-semibold mb-4">Taxa de Ocupação Geral</h3>
+    <p id="occupancy-rate" class="text-3xl font-bold mb-4">0%</p>
+    <p class="text-gray-500">de ocupação das turmas</p>
+    <p id="occupancy-details" class="text-gray-500">0 alunos matriculados de 0 vagas totais</p>
+</div>
+<div class="grid grid-cols-1 md:grid-cols-2 gap-6 mt-6">
+    <div class="bg-white p-4 rounded-lg shadow-md">
+        <h3 class="text-lg font-semibold mb-4">Alunos Matriculados</h3>
+        <div id="enrolled-students" class="space-y-4"></div>
+    </div>
+    <div class="bg-white p-4 rounded-lg shadow-md">
+        <h3 class="text-lg font-semibold mb-4">Alunos Disponíveis</h3>
+        <div class="relative mb-4">
+            <input
+                id="student-search-available"
+                type="text"
+                placeholder="Buscar alunos..."
+                class="w-full p-2 pl-10 border rounded-md"
+                oninput="filterAvailableStudents()"
+            >
+            <svg class="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-gray-400" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z"/>
+            </svg>
+        </div>
+        <div id="available-students" class="space-y-4"></div>
+    </div>
+</div>
+{% endblock %}
+
+{% block scripts %}
+<script src="/static/js/reports.js"></script>
+<script>
+    function showTab(tabId) {
+        document.getElementById('disciplinas-tab').classList.add('hidden');
+        document.getElementById('dias-tab').classList.add('hidden');
+        document.getElementById('taxa-tab').classList.add('hidden');
+        document.getElementById(tabId + '-tab').classList.remove('hidden');
+
+        document.querySelectorAll('button').forEach(btn => {
+            btn.classList.remove('bg-blue-600', 'text-white');
+            btn.classList.add('bg-gray-200', 'text-gray-700', 'hover:bg-gray-300');
+        });
+        document.querySelector(`button[onclick="showTab('${tabId}')"]`).classList.remove('bg-gray-200', 'text-gray-700', 'hover:bg-gray-300');
+        document.querySelector(`button[onclick="showTab('${tabId}')"]`).classList.add('bg-blue-600', 'text-white', 'hover:bg-blue-700');
+    }
+
+    function filterAvailableStudents() {
+        const search = document.getElementById('student-search-available').value.toLowerCase();
+        const availableStudents = students.filter(student => {
+            const matchesSearch = student.name.toLowerCase().includes(search) || student.id.includes(search);
+            const isNotEnrolled = !enrollments.some(e => e.studentId === student.id);
+            return matchesSearch && isNotEnrolled;
+        });
+        const div = document.getElementById('available-students');
+        div.innerHTML = availableStudents.length === 0 ?
+            '<div class="text-center py-4 text-gray-500">Nenhum aluno disponível.</div>' :
+            availableStudents.map(student => `
+                <div class="flex items-center justify-between p-3 border rounded-md hover:bg-gray-50">
+                    <div class="flex items-center">
+                        <div class="h-10 w-10 rounded-full bg-blue-600 text-white flex items-center justify-center mr-3">
+                            ${student.name.split(' ').map(n => n[0]).join('').toUpperCase().substring(0, 2)}
+                        </div>
+                        <div>
+                            <p class="font-medium">${student.name}</p>
+                            <p class="text-sm text-gray-500">ID: ${student.id} | ${student.grade}º Ano</p>
+                        </div>
+                    </div>
+                    <button onclick="window.location.href='/enrollment?studentId=${student.id}'" class="bg-blue-600 text-white px-3 py-1 rounded-md hover:bg-blue-700">Matricular</button>
+                </div>
+            `).join('');
+    }
+
+    document.addEventListener('DOMContentLoaded', () => {
+        showTab('disciplinas');
+        filterAvailableStudents();
+    });
+</script>
+{% endblock %}

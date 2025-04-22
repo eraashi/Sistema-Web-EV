@@ -1,0 +1,20 @@
+{
+  "name": "escola-viva",
+  "version": "1.0.0",
+  "description": "Sistema de Gestão Escola Viva",
+  "main": "index.js",
+  "scripts": {
+    "build:css": "npx tailwindcss -i static/css/styles.css -o static/css/output.css --watch"
+  },
+  "keywords": [],
+  "author": "",
+  "license": "ISC",
+  "devDependencies": {
+    "autoprefixer": "^10.4.16",
+    "postcss": "^8.4.31",
+    "tailwindcss": "^3.4.17"
+  },
+  "dependencies": {
+    "@tailwindcss/vite": "^4.1.4"
+  }
+}
