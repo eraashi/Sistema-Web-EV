@@ -33,18 +33,18 @@
                     Alunos
                 </a>
                 <a href="/classes" class="flex items-center p-4 hover:bg-blue-700 {% if request.path == '/classes' %}bg-blue-700{% endif %}">
-                    <svg class="h-5 w-5 mr-2" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 6.253v13m0-13C10.832 5.477 9.246 5 7.5 5S4.168 5.477 3 6.253v13C4.168 18.477 5.754 18 7.5 18s3.332.477 4.5 1.253m0-13C13.168 5.477 14.754 5 16.5 5c1.747 0 3.332.477 4.5 1.253v13C19.832 18.477 18.247 18 16.5 18c-1.746 0-3.332.477-4.5 1.253"/>
-                    </svg>
+                    <i data-lucide="library-big" class="h-5 w-5 mr-2"></i>
                     Turmas
                 </a>
                 <a href="/enrollment" class="flex items-center p-4 hover:bg-blue-700 {% if request.path == '/enrollment' %}bg-blue-700{% endif %}">
-                    <svg class="h-5 w-5 mr-2" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 5H7a2 2 0 00-2 2v12a2 2 0 002 2h10a2 2 0 002-2V7a2 2 0 00-2-2h-2M9 5a2 2 0 002 2h2a2 2 0 002-2M9 5a2 2 0 012-2h2a2 2 0 012 2"/>
-                    </svg>
+                    <i data-lucide="notebook-pen" class="h-5 w-5 mr-2"></i>
                     Enturmar Alunos
                 </a>
                 <a href="/reports" class="flex items-center p-4 hover:bg-blue-700 {% if request.path == '/reports' %}bg-blue-700{% endif %}">
+                    <i data-lucide="chart-bar" class="h-5 w-5 mr-2"></i>
+                    Estatísticas
+                </a>
+                <a href="/reports_new" class="flex items-center p-4 hover:bg-blue-700 {% if request.path == '/reports_new' %}bg-blue-700{% endif %}">
                     <svg class="h-5 w-5 mr-2" fill="none" viewBox="0 0 24 24" stroke="currentColor">
                         <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 5H7a2 2 0 00-2 2v12a2 2 0 002 2h10a2 2 0 002-2V7a2 2 0 00-2-2h-2M9 5a2 2 0 002 2h2a2 2 0 002-2M9 5a2 2 0 012-2h2a2 2 0 012 2"/>
                     </svg>
@@ -69,7 +69,7 @@
     </div>
     <!-- Custom Toast Container -->
     <div id="custom-toast-container" class="fixed bottom-4 right-4 z-[10000] flex flex-col space-y-2">
-        <!-- Toasts will be dynamically added here -->
+        <!-- Toasts will be dynamically added aqui -->
     </div>
 
     <script>

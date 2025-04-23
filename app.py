@@ -15,8 +15,6 @@ app.config['PERMANENT_SESSION_LIFETIME'] = 3600  # 1 hora
 app.config['SESSION_COOKIE_HTTPONLY'] = True
 app.config['SESSION_COOKIE_SAMESITE'] = 'Lax'
 app.config['SESSION_COOKIE_SECURE'] = False  # Alterar para True se usar HTTPS
-# Remover SESSION_COOKIE_DOMAIN para permitir que o Flask determine o domínio automaticamente
-# app.config['SESSION_COOKIE_DOMAIN'] = '127.0.0.1'
 
 # Configurar Supabase
 supabase = create_client(os.getenv('SUPABASE_URL'), os.getenv('SUPABASE_ANON_KEY'))
@@ -89,6 +87,15 @@ def reports():
     print(f"Usuário autenticado em /reports: {user['id']}")
     return render_template('reports.html', user=user)
 
+@app.route('/reports_new')
+def reports_new():
+    user = get_current_user()
+    if not user:
+        print("Nenhum usuário autenticado em /reports_new, redirecionando para login")
+        return redirect(url_for('login'))
+    print(f"Usuário autenticado em /reports_new: {user['id']}")
+    return render_template('reports_new.html', user=user)
+
 @app.route('/classes')
 def classes():
     user = get_current_user()
@@ -139,6 +146,103 @@ def logout():
     session.pop('user_id', None)
     print("Usuário deslogado, sessão limpa")
     return jsonify({'message': 'Logout successful'})
+
+@app.route('/api/presencas', methods=['GET'])
+def get_presencas():
+    user = get_current_user()
+    if not user:
+        print("Erro: Usuário não autenticado em /api/presencas")
+        return jsonify({'error': 'Unauthorized'}), 401
+    try:
+        # Buscar presenças com informações da turma e do polo
+        query = supabase.from_('presenca').select(
+            'id, id_aluno, matricula, nome_aluno, unidade, etapa, turno_escola_viva, presenca, data_escaneamento, hora_escaneamento, turma_id, turmas!turma_id(nome, faixa_etaria, polo_id, polos!turmas_polo_id_fkey(nome))'
+        )
+
+        # Filtrar com base no cargo do usuário
+        if user['cargo'] in ['admin', 'secretaria']:
+            presencas = execute_supabase_query(query)
+        elif user['cargo'] in ['monitor', 'diretor', 'coordenador']:
+            # Filtrar apenas presenças de turmas do polo do usuário
+            presencas = execute_supabase_query(
+                query.match({'turmas.polo_id': user['polo_id']})
+            )
+        else:
+            presencas = []
+
+        print(f"Presenças retornadas: {presencas}")
+
+        result = []
+        for presenca in presencas:
+            turma = presenca.get('turmas', {})
+            polo = turma.get('polos', {}) if turma else {}
+            result.append({
+                'id': presenca['id'],
+                'id_aluno': presenca['id_aluno'],
+                'matricula': presenca['matricula'],
+                'nome_aluno': presenca['nome_aluno'],
+                'unidade': presenca['unidade'],
+                'etapa': presenca['etapa'],
+                'turno_escola_viva': presenca['turno_escola_viva'],
+                'presenca': presenca['presenca'],
+                'data_escaneamento': presenca['data_escaneamento'],
+                'hora_escaneamento': presenca['hora_escaneamento'],
+                'turma_id': presenca['turma_id'],
+                'turma_nome': turma.get('nome', 'Não especificado'),
+                'faixa_etaria': turma.get('faixa_etaria', []),
+                'polo_nome': polo.get('nome', 'Não especificado')
+            })
+        print(f"Resultado final de presenças: {result}")
+        return jsonify(result)
+    except Exception as e:
+        print(f"Erro em get_presencas: {str(e)}")
+        return jsonify({'error': str(e)}), 500
+
+@app.route('/api/ocorrencias', methods=['GET'])
+def get_ocorrencias():
+    user = get_current_user()
+    if not user:
+        print("Erro: Usuário não autenticado em /api/ocorrencias")
+        return jsonify({'error': 'Unauthorized'}), 401
+    try:
+        # Buscar ocorrências com informações da turma e do polo
+        query = supabase.table('ocorrencias').select(
+            'id, turma_id, ocorrencia, data_escaneamento, turmas!turma_id(nome, faixa_etaria, periodo, polo_id, polos!turmas_polo_id_fkey(nome))'
+        )
+
+        # Filtrar com base no cargo do usuário
+        if user['cargo'] in ['admin', 'secretaria']:
+            ocorrencias = execute_supabase_query(query)
+        elif user['cargo'] in ['monitor', 'diretor', 'coordenador']:
+            # Filtrar apenas ocorrências de turmas do polo do usuário
+            ocorrencias = execute_supabase_query(
+                query.match({'turmas.polo_id': user['polo_id']})
+            )
+        else:
+            ocorrencias = []
+
+        print(f"Ocorrências retornadas: {ocorrencias}")
+
+        result = []
+        for ocorrencia in ocorrencias:
+            turma = ocorrencia.get('turmas', {})
+            polo = turma.get('polos', {}) if turma else {}
+            print(f"Dados da turma para ocorrência {ocorrencia['id']}: {turma}")
+            result.append({
+                'id': ocorrencia['id'],
+                'turma_id': ocorrencia['turma_id'],
+                'ocorrencia': ocorrencia['ocorrencia'],
+                'data_escaneamento': ocorrencia['data_escaneamento'],
+                'turma_nome': turma.get('nome', 'Não especificado'),
+                'faixa_etaria': turma.get('faixa_etaria', []),
+                'turno': turma.get('periodo', 'Não especificado'),
+                'polo_nome': polo.get('nome', 'Não especificado')
+            })
+        print(f"Resultado final de ocorrências: {result}")
+        return jsonify(result)
+    except Exception as e:
+        print(f"Erro em get_ocorrencias: {str(e)}")
+        return jsonify({'error': str(e)}), 500
 
 @app.route('/api/alunos', methods=['GET'])
 def manage_alunos():
