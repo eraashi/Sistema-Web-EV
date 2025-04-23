@@ -12,9 +12,14 @@
     <div class="border border-blue-400 rounded-lg shadow-md p-4">
         <div class="flex items-center mb-2">
             <i data-lucide="users" class="h-6 w-6 text-blue-600 mr-2"></i>
-            <h3 class="text-sm font-medium text-gray-500">Total de Alunos</h3>
+            <h3 class="text-sm font-medium text-gray-500">Total de Alunos disponíveis no Escola Viva</h3>
         </div>
         <p id="total-students" class="text-2xl font-bold">0</p>
+        {% if user.cargo in ['diretor', 'coordenador', 'monitor'] %}
+            <p class="text-sm text-gray-500 mt-2">
+                Total de alunos no seu polo atual: <span id="polo-students">0</span>
+            </p>
+        {% endif %}
     </div>
     <div class="border border-blue-400 rounded-lg shadow-md p-4">
         <div class="flex items-center mb-2">
@@ -55,5 +60,9 @@
 {% endblock %}
 
 {% block scripts %}
+<script>
+    // Passar apenas o cargo do usuário logado para o JavaScript
+    const currentUserRole = "{{ user.cargo }}";
+</script>
 <script src="/static/js/dashboard.js"></script>
 {% endblock %}

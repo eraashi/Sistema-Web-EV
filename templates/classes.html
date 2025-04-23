@@ -12,12 +12,12 @@
             <button id="filter-cognitiva" class="bg-blue-600 text-white px-4 py-2 rounded-md hover:bg-blue-700">Cognitivas</button>
             <button id="filter-motora" class="bg-gray-200 text-gray-700 px-4 py-2 rounded-md hover:bg-gray-300">Motoras</button>
         </div>
-        <a href="/new_class" class="bg-blue-600 text-white px-4 py-2 rounded-md hover:bg-blue-700 flex items-center">
+        <button id="create-class-button" class="bg-blue-600 text-white px-4 py-2 rounded-md hover:bg-blue-700 flex items-center">
             <svg class="h-5 w-5 mr-2" fill="none" viewBox="0 0 24 24" stroke="currentColor">
                 <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 4v16m8-8H4"/>
             </svg>
             Nova Turma
-        </a>
+        </button>
     </div>
 </div>
 <div class="bg-white rounded-lg shadow-md overflow-hidden px-6">
@@ -31,13 +31,458 @@
                 <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">Dias</th>
                 <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">Horário</th>
                 <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">Ocupação</th>
+                {% if user.cargo in ['admin', 'secretaria', 'coordenador'] %}
+                    <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">Ações</th>
+                {% endif %}
             </tr>
         </thead>
         <tbody id="class-table-body" class="divide-y divide-gray-200"></tbody>
     </table>
 </div>
+
+<!-- Container para Toasts -->
+<div id="custom-toast-container"></div>
+
+<!-- Modal de Edição -->
+<div id="edit-class-modal" class="modal">
+    <div class="modal-content">
+        <h2 class="modal-title">Editar Turma</h2>
+        <form id="edit-class-form">
+            <input type="hidden" id="edit-class-id" name="id">
+            <div class="modal-grid">
+                <div class="modal-field">
+                    <label for="edit-name" class="modal-label">Nome</label>
+                    <input type="text" id="edit-name" name="name" class="modal-input" required>
+                </div>
+                <div class="modal-field">
+                    <label for="edit-polo-name" class="modal-label">Polo</label>
+                    <select id="edit-polo-name" name="polo_name" class="modal-input" disabled>
+                        <option value="POLO I (Porto da Roça)">POLO I (Porto da Roça)</option>
+                        <option value="POLO II (Sampaio Correia)">POLO II (Sampaio Correia)</option>
+                        <option value="Polo III (Jaconé)">Polo III (Jaconé)</option>
+                        <option value="Polo IV (Saquarema)">Polo IV (Saquarema)</option>
+                    </select>
+                </div>
+                <div class="modal-field">
+                    <label for="edit-type" class="modal-label">Tipo</label>
+                    <select id="edit-type" name="type" class="modal-input" disabled>
+                        <option value="cognitiva">Cognitiva</option>
+                        <option value="motora">Motora</option>
+                    </select>
+                </div>
+                <div class="modal-field">
+                    <label for="edit-grades" class="modal-label">Ano Escolar</label>
+                    <select id="edit-grades" name="grades" class="modal-input">
+                        <option value='["4", "5"]'>4º e 5º Ano</option>
+                        <option value='["6", "7"]'>6º e 7º Ano</option>
+                        <option value='["8", "9"]'>8º e 9º Ano</option>
+                    </select>
+                </div>
+                <div class="modal-field">
+                    <label for="edit-day" class="modal-label">Dia da Semana</label>
+                    <select id="edit-day" name="day" class="modal-input">
+                        <option value="seg">Segunda-feira</option>
+                        <option value="ter">Terça-feira</option>
+                        <option value="qua">Quarta-feira</option>
+                        <option value="qui">Quinta-feira</option>
+                        <option value="sex">Sexta-feira</option>
+                    </select>
+                </div>
+                <div class="modal-field">
+                    <label for="edit-period" class="modal-label">Período</label>
+                    <select id="edit-period" name="period" class="modal-input">
+                        <option value="manha">Manhã</option>
+                        <option value="tarde">Tarde</option>
+                    </select>
+                </div>
+                <div class="modal-field">
+                    <label for="edit-capacity" class="modal-label">Capacidade</label>
+                    <input type="number" id="edit-capacity" name="capacity", class="modal-input" required>
+                </div>
+            </div>
+            <div class="modal-footer">
+                <button type="button" id="cancel-edit-class" class="modal-button modal-button-cancel">Cancelar</button>
+                <button type="submit" class="modal-button modal-button-save">Salvar</button>
+            </div>
+        </form>
+        <div class="attention-box">
+            <p class="attention-title"><strong>Atenção!</strong></p>
+            <p class="attention-text">Após editar qualquer dado da turma, todos os alunos serão removidos dela e será necessário matriculá-los novamente. Para isso, acesse: "Enturmar Alunos" nas opções do lado esquerdo.</p>
+        </div>
+    </div>
+</div>
+
+<!-- Modal de Criação -->
+<div id="create-class-modal" class="modal">
+    <div class="modal-content modal-content-narrow">
+        <h2 class="modal-title">Criar Nova Turma</h2>
+        <form id="create-class-form">
+            <div class="modal-fields">
+                <div class="modal-field flex items-center mb-4">
+                    <i data-lucide="book-type" class="h-5 w-5 mr-2 icon-align"></i>
+                    <div class="field-container">
+                        <label for="create-name" class="modal-label">Título</label>
+                        <input type="text" id="create-name" name="name" class="modal-input modal-input-narrow" placeholder="Nome da turma" required>
+                        <div class="tooltip" id="tooltip-name"></div>
+                    </div>
+                </div>
+                <div class="modal-field flex items-center mb-4">
+                    <i id="type-icon" data-lucide="brain" class="h-5 w-5 mr-2 icon-align"></i>
+                    <div class="field-container">
+                        <label for="create-type" class="modal-label">Tipo</label>
+                        <select id="create-type" name="type" class="modal-input modal-input-narrow" required>
+                            <option value="" disabled selected hidden>Escolha um...</option>
+                            <option value="cognitiva">Cognitiva</option>
+                            <option value="motora">Motora</option>
+                        </select>
+                        <div class="tooltip" id="tooltip-type"></div>
+                    </div>
+                </div>
+                <div class="modal-field flex items-center mb-4">
+                    <i data-lucide="calendar" class="h-5 w-5 mr-2 icon-align"></i>
+                    <div class="field-container">
+                        <label for="create-day" class="modal-label">Dia da Semana</label>
+                        <select id="create-day" name="day" class="modal-input modal-input-narrow" required>
+                            <option value="" disabled selected hidden>Escolha um...</option>
+                            <option value="seg">Segunda-feira</option>
+                            <option value="ter">Terça-feira</option>
+                            <option value="qua">Quarta-feira</option>
+                            <option value="qui">Quinta-feira</option>
+                            <option value="sex">Sexta-feira</option>
+                        </select>
+                        <div class="tooltip" id="tooltip-day"></div>
+                    </div>
+                </div>
+                <div class="modal-field flex items-center mb-4">
+                    <i data-lucide="clock" class="h-5 w-5 mr-2 icon-align"></i>
+                    <div class="field-container">
+                        <label for="create-period" class="modal-label">Período</label>
+                        <select id="create-period" name="period" class="modal-input modal-input-narrow" required>
+                            <option value="" disabled selected hidden>Escolha um...</option>
+                            <option value="manha">Manhã</option>
+                            <option value="tarde">Tarde</option>
+                        </select>
+                        <div class="tooltip" id="tooltip-period"></div>
+                    </div>
+                </div>
+                <div class="modal-field flex items-center mb-4">
+                    <i data-lucide="graduation-cap" class="h-5 w-5 mr-2 icon-align"></i>
+                    <div class="field-container">
+                        <label for="create-grades" class="modal-label">Ano Escolar</label>
+                        <select id="create-grades" name="grades" class="modal-input modal-input-narrow" required>
+                            <option value="" disabled selected hidden>Escolha um...</option>
+                            <option value='["4", "5"]'>4º e 5º Ano</option>
+                            <option value='["6", "7"]'>6º e 7º Ano</option>
+                            <option value='["8", "9"]'>8º e 9º Ano</option>
+                        </select>
+                        <div class="tooltip" id="tooltip-grades"></div>
+                    </div>
+                </div>
+                <div class="modal-field flex items-center mb-4">
+                    <i data-lucide="school" class="h-5 w-5 mr-2 icon-align"></i>
+                    <div class="field-container">
+                        <label for="create-polo-name" class="modal-label">Polo</label>
+                        <select id="create-polo-name" name="polo_name" class="modal-input modal-input-narrow" required>
+                            <option value="" disabled selected hidden>Escolha um...</option>
+                            <option value="POLO I (Porto da Roça)">POLO I (Porto da Roça)</option>
+                            <option value="POLO II (Sampaio Correia)">POLO II (Sampaio Correia)</option>
+                            <option value="Polo III (Jaconé)">Polo III (Jaconé)</option>
+                            <option value="Polo IV (Saquarema)">Polo IV (Saquarema)</option>
+                        </select>
+                        <div class="tooltip" id="tooltip-polo-name"></div>
+                    </div>
+                </div>
+                <div class="modal-field flex items-center mb-4">
+                    <i data-lucide="users" class="h-5 w-5 mr-2 icon-align"></i>
+                    <div class="field-container">
+                        <label for="create-capacity" class="modal-label">Capacidade</label>
+                        <input type="number" id="create-capacity" name="capacity" class="modal-input modal-input-narrow" placeholder="Digite um número..." required>
+                        <div class="tooltip" id="tooltip-capacity"></div>
+                    </div>
+                </div>
+            </div>
+            <div class="attention-box">
+                <p class="attention-text" style="color: #6b7280; font-size: 0.875rem;">
+                    Para matricular alunos nas turmas acesse: "Enturmar Alunos" na opção do lado esquerdo.
+                </p>
+            </div>
+            <div class="modal-footer">
+                <button type="button" id="cancel-create-class" class="modal-button modal-button-cancel">Cancelar</button>
+                <button type="submit" class="modal-button modal-button-save">Salvar</button>
+            </div>
+        </form>
+    </div>
+</div>
+
+<!-- Elemento invisível para forçar a inclusão da classe bg-purple-100 no Tailwind CSS -->
+<div class="hidden bg-purple-100"></div>
+
+<style>
+/* Estilo do Modal */
+.modal {
+    display: none;
+    position: fixed;
+    z-index: 1000;
+    left: 0;
+    top: 0;
+    width: 100%;
+    height: 100%;
+    overflow: auto;
+    background-color: rgba(0, 0, 0, 0.5);
+}
+
+.modal-content {
+    background-color: #fff;
+    margin: auto;
+    padding: 20px;
+    border: 1px solid #888;
+    width: 80%;
+    max-width: 800px;
+    border-radius: 8px;
+    position: relative;
+    top: 50%;
+    transform: translateY(-50%);
+}
+
+.modal-content-narrow {
+    width: 420px; /* Ajustando a largura do modal para o limite dos inputs/selects */
+    max-width: 420px;
+}
+
+.modal-title {
+    font-size: 1.25rem;
+    font-weight: 600;
+    margin-bottom: 20px;
+}
+
+.modal-grid {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 16px;
+}
+
+.modal-fields {
+    display: flex;
+    flex-direction: column;
+    gap: 8px; /* Espaço vertical reduzido */
+}
+
+.modal-field {
+    display: flex;
+    flex-direction: row;
+    align-items: center;
+    position: relative; /* Para posicionar o tooltip */
+}
+
+.field-container {
+    display: flex;
+    flex-direction: column;
+    flex: 1;
+}
+
+.modal-label {
+    font-size: 0.875rem;
+    font-weight: 500;
+    color: #374151;
+    margin-bottom: 4px;
+}
+
+.modal-input {
+    width: 100%;
+    padding: 8px;
+    border: 1px solid #d1d5db;
+    border-radius: 4px;
+    font-size: 1rem;
+    outline: none;
+}
+
+.modal-input-narrow {
+    width: 350px; /* Largura ajustada */
+}
+
+.modal-input:focus {
+    border-color: #3b82f6;
+    box-shadow: 0 0 0 2px rgba(59, 130, 246, 0.5);
+}
+
+.icon-align {
+    position: relative;
+    top: 8px; /* Alinhamento mantido */
+}
+
+.modal-footer {
+    margin-top: 24px;
+    display: flex;
+    justify-content: flex-end;
+    gap: 8px;
+}
+
+.modal-button {
+    padding: 8px 16px;
+    border-radius: 4px;
+    font-size: 1rem;
+    cursor: pointer;
+}
+
+.modal-button-cancel {
+    background-color: #d1d5db;
+    color: #374151;
+}
+
+.modal-button-cancel:hover {
+    background-color: #9ca3af;
+}
+
+.modal-button-save {
+    background-color: #2563eb;
+    color: #fff;
+}
+
+.modal-button-save:hover {
+    background-color: #1d4ed8;
+}
+
+/* Estilo do Botão Editar */
+.edit-button {
+    background-color: #f59e0b;
+    color: #fff;
+    padding: 4px 8px;
+    border-radius: 4px;
+    display: inline-flex;
+    align-items: center;
+    gap: 4px;
+    font-size: 14px;
+    border: none;
+    cursor: pointer;
+    visibility: visible !important;
+}
+
+.edit-button:hover {
+    background-color: #d97706;
+}
+
+.edit-button i {
+    width: 16px;
+    height: 16px;
+}
+
+/* Estilo da Div de Atenção */
+.attention-box {
+    margin-top: 20px;
+    padding: 12px;
+    border: 2px solid #93c5fd; /* Contorno azul */
+    border-radius: 8px;
+    background-color: #f3f4f6; /* Cinza claro */
+    width: 376px; /* Ajustando para o limite interno do modal (420px - 40px padding - 4px borda) */
+}
+
+.attention-title {
+    font-size: 1rem;
+    font-weight: 600;
+    color: #1f2937;
+    margin-bottom: 8px;
+}
+
+.attention-text {
+    font-size: 0.875rem;
+    color: #4b5563;
+    line-height: 1.5;
+    white-space: normal; /* Permite que o texto quebre em várias linhas */
+}
+
+/* Estilo do Tooltip */
+.tooltip {
+    position: absolute;
+    top: 50%;
+    left: -10px; /* Posiciona o tooltip à esquerda do campo */
+    transform: translateY(-50%);
+    background-color: #ef4444; /* Vermelho para erro */
+    color: white;
+    padding: 4px 8px;
+    border-radius: 4px;
+    font-size: 12px;
+    white-space: nowrap;
+    z-index: 1000;
+    display: none;
+    animation: fadeInOut 3s ease-in-out forwards;
+}
+
+/* Animação para o Tooltip */
+@keyframes fadeInOut {
+    0% { opacity: 0; transform: translateY(-50%) translateX(-10px); }
+    10% { opacity: 1; transform: translateY(-50%) translateX(0); }
+    90% { opacity: 1; transform: translateY(-50%) translateX(0); }
+    100% { opacity: 0; transform: translateY(-50%) translateX(-10px); }
+}
+
+/* Toast Container */
+#custom-toast-container {
+    position: fixed !important;
+    bottom: 16px !important;
+    right: 16px !important;
+    z-index: 10001 !important; /* z-index maior que o modal (1000) */
+    display: flex !important;
+    flex-direction: column !important;
+    gap: 8px !important;
+}
+
+/* Toast Styles */
+#custom-toast-container .custom-toast {
+    display: flex !important;
+    align-items: center !important;
+    justify-content: space-between !important;
+    min-width: 200px !important;
+    padding: 6px 10px !important;
+    border-radius: 6px !important;
+    box-shadow: 0 2px 4px rgba(0, 0, 0, 0.1) !important;
+    color: white !important;
+    font-size: 13px !important;
+    line-height: 1.2 !important;
+}
+
+#custom-toast-container .custom-toast-success {
+    background-color: #22c55e !important;
+    animation: fadeInOut 3s ease-in-out forwards !important;
+}
+
+#custom-toast-container .custom-toast-error {
+    background-color: #ef4444 !important;
+    animation: fadeInOut 3s ease-in-out forwards !important;
+}
+
+#custom-toast-container .custom-toast-warning {
+    background-color: #f59e0b !important;
+    animation: fadeInOut 5s ease-in-out forwards !important;
+}
+
+#custom-toast-container .custom-toast-icon {
+    margin-right: 6px !important;
+    flex-shrink: 0 !important;
+}
+
+#custom-toast-container .custom-toast-message {
+    flex: 1 !important;
+    overflow: hidden !important;
+    text-overflow: ellipsis !important;
+    white-space: nowrap !important;
+}
+
+#custom-toast-container .custom-toast-close {
+    background: none !important;
+    border: none !important;
+    color: white !important;
+    font-size: 16px !important;
+    cursor: pointer !important;
+    padding: 0 6px !important;
+    flex-shrink: 0 !important;
+}
+</style>
 {% endblock %}
 
 {% block scripts %}
-<script src="/static/js/classes.js"></script>
+<script>
+    // Passar o cargo do usuário logado para o JavaScript
+    const currentUserRole = "{{ user.cargo }}";
+</script>
+<script src="/static/js/classes.js?v=17"></script>
 {% endblock %}

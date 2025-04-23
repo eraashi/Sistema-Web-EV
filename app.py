@@ -38,8 +38,9 @@ def get_current_user():
         print("Nenhum user_id encontrado na sessão")
         return None
     try:
+        # Buscar o funcionário com os dados do polo associados
         funcionarios = execute_supabase_query(
-            supabase.table('funcionarios').select('*').eq('id', session['user_id'])
+            supabase.table('funcionarios').select('*, polos(nome)').eq('id', session['user_id'])
         )
         if not funcionarios or len(funcionarios) == 0:
             print("Funcionário não encontrado para o user_id na sessão")
@@ -185,7 +186,8 @@ def manage_alunos():
         if etapa and etapa.lower() != 'tudo':
             base_query = base_query.eq('etapa', etapa)
         if status and status.lower() != 'tudo':
-            base_query = base_query.eq('status', status)
+            # Este filtro será tratado no lado do servidor, não no banco
+            pass
 
         if count_only:
             total_response = base_query.execute()
@@ -193,7 +195,7 @@ def manage_alunos():
             return jsonify({'total_alunos': total_alunos})
 
         query = supabase.table('alunos').select(
-            'id, nome, matricula, polo_id, polos(nome), turma_unidade, genero, pcd, unidade, etapa, turno, data_nascimento, matriculas(turmas(disciplinas(tipo)))'
+            'id, nome, matricula, polo_id, polos(nome), turma_unidade, genero, pcd, unidade, etapa, turno, data_nascimento, matriculas(turmas(disciplinas(tipo), dia_semana))'
         )
 
         if nome:
@@ -214,14 +216,12 @@ def manage_alunos():
             query = query.ilike('unidade', f'%{unidade}%')
         if etapa and etapa.lower() != 'tudo':
             query = query.eq('etapa', etapa)
-        if status and status.lower() != 'tudo':
-            query = query.eq('status', status)
 
-        # Carregar todos os alunos em lotes de 1000
+        # Calcular o total de alunos que correspondem aos filtros
         total_response = base_query.execute()
         total_alunos = total_response.count
-        
-        # Carregar os alunos em lotes
+
+        # Carregar todos os alunos em lotes de 1000 (sem paginação)
         batch_size = 1000
         alunos = []
         for start in range(0, total_alunos, batch_size):
@@ -235,14 +235,34 @@ def manage_alunos():
         result = []
         for aluno in alunos:
             matriculas = aluno.get('matriculas', [])
-            cognitive_count = sum(1 for m in matriculas if m['turmas']['disciplinas']['tipo'] == 'cognitiva')
-            total_count = len(matriculas)
-            required_count = 4 if aluno['etapa'] in ['4º Ano', '5º Ano', '6º Ano', '7º Ano'] else 2
+            # Contar matrículas por dia
+            dias_matriculados = {}
+            cognitive_count = 0
+            motor_count = 0
+            for m in matriculas:
+                dia = m['turmas']['dia_semana']
+                tipo = m['turmas']['disciplinas']['tipo']
+                if dia not in dias_matriculados:
+                    dias_matriculados[dia] = {'cognitiva': 0, 'motora': 0}
+                if tipo == 'cognitiva':
+                    dias_matriculados[dia]['cognitiva'] += 1
+                    cognitive_count += 1
+                elif tipo == 'motora':
+                    dias_matriculados[dia]['motora'] += 1
+                    motor_count += 1
+
+            # Determinar o status
+            dias_completos = sum(1 for dia, counts in dias_matriculados.items() if counts['cognitiva'] >= 1 and counts['motora'] >= 1)
             status = 'pending'
-            if total_count >= required_count and cognitive_count >= 1:
+            if dias_completos == 2:  # Matriculado em 2 dias (4 matrículas: 2 cognitivas e 2 motoras)
                 status = 'complete'
-            elif total_count > 0:
+            elif dias_completos == 1:  # Matriculado em 1 dia (2 matrículas: 1 cognitiva e 1 motora)
                 status = 'partial'
+
+            # Aplicar filtro de status, se especificado
+            if status.lower() != 'tudo' and status != status.lower():
+                continue
+
             result.append({
                 'id': aluno['id'],
                 'name': aluno['nome'],
@@ -261,10 +281,293 @@ def manage_alunos():
             'data': result,
             'total_pages': total_pages,
             'current_page': 1,
-            'total_alunos': total_alunos
+            'total_alunos': len(result)  # Ajustado para refletir o número de alunos após o filtro de status
         })
     except Exception as e:
         print(f"Erro em get_alunos: {str(e)}")
+        return jsonify({'error': str(e)}), 500
+
+@app.route('/api/alunos/polo_count', methods=['GET'])
+def get_alunos_polo_count():
+    user = get_current_user()
+    if not user:
+        print("Erro: Usuário não autenticado em /api/alunos/polo_count")
+        return jsonify({'error': 'Unauthorized'}), 401
+    try:
+        # Verificar se o usuário tem um polo associado
+        if 'polo_id' not in user or not user['polo_id']:
+            print("Erro: Usuário não tem polo_id associado")
+            return jsonify({'error': 'Usuário não tem polo associado'}), 400
+
+        # Buscar o número de alunos do polo do usuário
+        base_query = supabase.table('alunos').select('id', count='exact').eq('polo_id', user['polo_id'])
+        response = base_query.execute()
+        total_alunos_polo = response.count
+
+        print(f"Número de alunos no polo {user['polo_id']}: {total_alunos_polo}")
+        return jsonify({'total_alunos_polo': total_alunos_polo})
+    except Exception as e:
+        print(f"Erro em get_alunos_polo_count: {str(e)}")
+        return jsonify({'error': str(e)}), 500
+
+@app.route('/api/alunos/<id>', methods=['PATCH'])
+def update_aluno(id):
+    print(f"Requisição recebida para /api/alunos/{id} com método PATCH")
+    user = get_current_user()
+    if not user:
+        print("Erro: Usuário não autenticado em /api/alunos/<id>")
+        return jsonify({'error': 'Unauthorized'}), 401
+    try:
+        data = request.json
+        print(f"Dados recebidos para atualização de aluno: {data}")
+        update_data = {
+            'nome': data.get('name'),
+            'polo_id': supabase.table('polos').select('id').eq('nome', data.get('polo_name')).execute().data[0]['id'],
+            'unidade': data.get('unidade'),
+            'genero': data.get('genero'),
+            'pcd': data.get('pcd'),
+            'etapa': data.get('etapa'),
+            'turno': data.get('turno'),
+            'data_nascimento': data.get('data_nascimento') or None
+        }
+        # Remover campos que não devem ser atualizados se não fornecidos
+        update_data = {k: v for k, v in update_data.items() if v is not None}
+        print(f"Dados para atualização no Supabase (aluno): {update_data}")
+        
+        response = supabase.table('alunos').update(update_data).eq('id', id).execute()
+        if not response.data:
+            print(f"Aluno com ID {id} não encontrado")
+            return jsonify({'error': 'Aluno não encontrado'}), 404
+        
+        print(f"Aluno com ID {id} atualizado com sucesso")
+        return jsonify({'message': 'Aluno atualizado com sucesso'})
+    except Exception as e:
+        print(f"Erro em update_aluno: {str(e)}")
+        return jsonify({'error': str(e)}), 500
+
+@app.route('/api/alunos/<id>/unenroll', methods=['DELETE'])
+def unenroll_aluno(id):
+    print(f"Requisição recebida para /api/alunos/{id}/unenroll com método DELETE")
+    user = get_current_user()
+    if not user:
+        print("Erro: Usuário não autenticado em /api/alunos/<id>/unenroll")
+        return jsonify({'error': 'Unauthorized'}), 401
+    try:
+        # Verificar se o aluno existe
+        aluno = supabase.table('alunos').select('id').eq('id', id).execute().data
+        if not aluno:
+            print(f"Aluno com ID {id} não encontrado")
+            return jsonify({'error': 'Aluno não encontrado'}), 404
+
+        # Remover todas as matrículas do aluno
+        supabase.table('matriculas').delete().eq('aluno_id', id).execute()
+        print(f"Aluno com ID {id} desenturmado com sucesso")
+        return jsonify({'message': 'Aluno desenturmado com sucesso'})
+    except Exception as e:
+        print(f"Erro em unenroll_aluno: {str(e)}")
+        return jsonify({'error': str(e)}), 500
+
+@app.route('/api/alunos_paginados', methods=['GET'])
+def manage_alunos_paginados():
+    user = get_current_user()
+    if not user:
+        print("Erro: Usuário não autenticado em /api/alunos_paginados")
+        return jsonify({'error': 'Unauthorized'}), 401
+    try:
+        count_only = request.args.get('count_only', 'false').lower() == 'true'
+        page = int(request.args.get('page', 1))
+        per_page = int(request.args.get('per_page', 100))  # Padrão de 100 alunos por página
+
+        nome = request.args.get('nome', '').strip()
+        matricula = request.args.get('matricula', '').strip()
+        polo_name = request.args.get('polo_name', '').strip()
+        turma_unidade = request.args.get('turma_unidade', '').strip()
+        genero = request.args.get('genero', '').strip()
+        pcd = request.args.get('pcd', '').strip()
+        unidade = request.args.get('unidade', '').strip()
+        etapa = request.args.get('etapa', '').strip()
+        status = request.args.get('status', '').strip()
+
+        # Converter o valor do filtro etapa para o formato esperado no banco (ex.: "4" -> "4º Ano")
+        if etapa and etapa.lower() != 'tudo':
+            etapa = f"{etapa}º Ano"
+
+        base_query = supabase.table('alunos').select('id', count='exact')
+
+        # Aplicar restrição inicial com base no cargo do usuário
+        if user['cargo'] in ['diretor', 'monitor']:
+            # Filtrar apenas alunos da mesma unidade do usuário
+            if user.get('unidade'):
+                base_query = base_query.eq('unidade', user['unidade'])
+            else:
+                # Se o usuário não tiver unidade definida, não retorna alunos
+                return jsonify({
+                    'data': [],
+                    'total_pages': 1,
+                    'current_page': 1,
+                    'total_alunos': 0
+                })
+        elif user['cargo'] == 'coordenador':
+            # Filtrar apenas alunos do mesmo polo do usuário
+            if user.get('polo_id'):
+                base_query = base_query.eq('polo_id', user['polo_id'])
+            else:
+                # Se o usuário não tiver polo definido, não retorna alunos
+                return jsonify({
+                    'data': [],
+                    'total_pages': 1,
+                    'current_page': 1,
+                    'total_alunos': 0
+                })
+        # Admin e secretaria veem todos os alunos, sem restrição adicional
+
+        # Aplicar filtros adicionais da query string
+        if nome:
+            base_query = base_query.ilike('nome', f'%{nome}%')
+        if matricula:
+            base_query = base_query.ilike('matricula', f'%{matricula}%')
+        if polo_name and polo_name.lower() != 'tudo':
+            base_query = base_query.eq('polo_id', (
+                supabase.table('polos').select('id').eq('nome', polo_name).execute().data[0]['id']
+            ))
+        if turma_unidade and turma_unidade.lower() != 'tudo':
+            base_query = base_query.ilike('turma_unidade', f'%{turma_unidade}%')
+        if genero and genero.lower() != 'tudo':
+            base_query = base_query.eq('genero', genero)
+        if pcd and pcd.lower() != 'tudo':
+            base_query = base_query.eq('pcd', 'Com Deficiência' if pcd.lower() == 'com deficiência' else 'Sem Deficiência')
+        if unidade and unidade.lower() != 'tudo':
+            base_query = base_query.ilike('unidade', f'%{unidade}%')
+        if etapa and etapa.lower() != 'tudo':
+            base_query = base_query.eq('etapa', etapa)
+
+        if count_only:
+            total_response = base_query.execute()
+            total_alunos = total_response.count
+            return jsonify({'total_alunos': total_alunos})
+
+        query = supabase.table('alunos').select(
+            'id, nome, matricula, polo_id, polos(nome), turma_unidade, genero, pcd, unidade, etapa, turno, data_nascimento, matriculas(turmas(disciplinas(tipo), dia_semana))'
+        )
+
+        # Aplicar as mesmas restrições iniciais à query principal
+        if user['cargo'] in ['diretor', 'monitor']:
+            if user.get('unidade'):
+                query = query.eq('unidade', user['unidade'])
+            else:
+                return jsonify({
+                    'data': [],
+                    'total_pages': 1,
+                    'current_page': 1,
+                    'total_alunos': 0
+                })
+        elif user['cargo'] == 'coordenador':
+            if user.get('polo_id'):
+                query = query.eq('polo_id', user['polo_id'])
+            else:
+                return jsonify({
+                    'data': [],
+                    'total_pages': 1,
+                    'current_page': 1,
+                    'total_alunos': 0
+                })
+
+        # Aplicar filtros adicionais da query string
+        if nome:
+            query = query.ilike('nome', f'%{nome}%')
+        if matricula:
+            query = query.ilike('matricula', f'%{matricula}%')
+        if polo_name and polo_name.lower() != 'tudo':
+            query = query.eq('polo_id', (
+                supabase.table('polos').select('id').eq('nome', polo_name).execute().data[0]['id']
+            ))
+        if turma_unidade and turma_unidade.lower() != 'tudo':
+            query = query.ilike('turma_unidade', f'%{turma_unidade}%')
+        if genero and genero.lower() != 'tudo':
+            query = query.eq('genero', genero)
+        if pcd and pcd.lower() != 'tudo':
+            query = query.eq('pcd', 'Com Deficiência' if pcd.lower() == 'com deficiência' else 'Sem Deficiência')
+        if unidade and unidade.lower() != 'tudo':
+            query = query.ilike('unidade', f'%{unidade}%')
+        if etapa and etapa.lower() != 'tudo':
+            query = query.eq('etapa', etapa)
+
+        # Calcular o total de alunos que correspondem aos filtros
+        total_response = base_query.execute()
+        total_alunos = total_response.count
+
+        # Carregar todos os alunos em lotes de 1000 para calcular o status
+        batch_size = 1000
+        alunos = []
+        for start in range(0, total_alunos, batch_size):
+            end = min(start + batch_size - 1, total_alunos - 1)
+            batch_query = query.range(start, end)
+            batch_alunos = execute_supabase_query(batch_query)
+            alunos.extend(batch_alunos)
+
+        total_pages = (total_alunos + per_page - 1) // per_page  # Arredonda para cima
+
+        # Calcular o status de cada aluno
+        result = []
+        for aluno in alunos:
+            matriculas = aluno.get('matriculas', [])
+            # Contar matrículas por dia
+            dias_matriculados = {}
+            cognitive_count = 0
+            motor_count = 0
+            for m in matriculas:
+                dia = m['turmas']['dia_semana']
+                tipo = m['turmas']['disciplinas']['tipo']
+                if dia not in dias_matriculados:
+                    dias_matriculados[dia] = {'cognitiva': 0, 'motora': 0}
+                if tipo == 'cognitiva':
+                    dias_matriculados[dia]['cognitiva'] += 1
+                    cognitive_count += 1
+                elif tipo == 'motora':
+                    dias_matriculados[dia]['motora'] += 1
+                    motor_count += 1
+
+            # Determinar o status
+            dias_completos = sum(1 for dia, counts in dias_matriculados.items() if counts['cognitiva'] >= 1 and counts['motora'] >= 1)
+            aluno_status = 'pending'
+            if dias_completos == 2:  # Matriculado em 2 dias (4 matrículas: 2 cognitivas e 2 motoras)
+                aluno_status = 'complete'
+            elif dias_completos == 1:  # Matriculado em 1 dia (2 matrículas: 1 cognitiva e 1 motora)
+                aluno_status = 'partial'
+
+            # Aplicar filtro de status, se especificado
+            if status and status.lower() != 'tudo' and aluno_status != status.lower():
+                continue
+
+            aluno_data = {
+                'id': aluno['id'],
+                'name': aluno['nome'],
+                'matricula': aluno['matricula'],
+                'polo_name': aluno['polos']['nome'],
+                'turma_unidade': aluno['turma_unidade'],
+                'genero': aluno['genero'],
+                'pcd': aluno['pcd'],
+                'unidade': aluno['unidade'],
+                'etapa': aluno['etapa'],
+                'turno': aluno['turno'],
+                'data_nascimento': aluno['data_nascimento'],
+                'status': aluno_status
+            }
+            result.append(aluno_data)
+
+        # Aplicar paginação
+        start = (page - 1) * per_page
+        end = min(start + per_page, len(result))
+        paginated_result = result[start:end]
+
+        return jsonify({
+            'data': paginated_result,
+            'total_pages': total_pages,
+            'current_page': page,
+            'total_alunos': len(result)
+        })
+    except Exception as e:
+        print(f"Erro em get_alunos_paginados: {str(e)}")
         return jsonify({'error': str(e)}), 500
 
 @app.route('/api/turmas', methods=['GET', 'POST'])
@@ -307,23 +610,98 @@ def get_turmas():
             print(f"Erro em get_turmas: {str(e)}")
             return jsonify({'error': str(e)}), 500
     elif request.method == 'POST':
+        print("Requisição recebida para /api/turmas com método POST")
         data = request.json
+        print(f"Dados recebidos para criação de turma: {data}")
         try:
-            matricula = execute_supabase_query(
-                supabase.table('matriculas').insert({
-                    'aluno_id': data['alunoId'],
-                    'turma_id': data['turmaId']
-                })
-            )[0]
-            print(f"Nova matrícula criada: {matricula}")
+            # Buscar o disciplina_id correspondente ao tipo da disciplina
+            disciplina = supabase.table('disciplinas').select('id').eq('tipo', data['type']).execute().data
+            if not disciplina or len(disciplina) == 0:
+                print(f"Disciplina do tipo {data['type']} não encontrada")
+                return jsonify({'error': f"Disciplina do tipo {data['type']} não encontrada"}), 400
+            disciplina_id = disciplina[0]['id']
+            print(f"Disciplina ID encontrada para tipo {data['type']}: {disciplina_id}")
+
+            # Inserir a nova turma no Supabase
+            turma_data = {
+                'nome': data['name'],
+                'disciplina_id': disciplina_id,
+                'faixa_etaria': data['grades'],
+                'dia_semana': data['day'],
+                'periodo': data['period'],
+                'capacidade': int(data['capacity']),
+                'polo_id': supabase.table('polos').select('id').eq('nome', data['polo_name']).execute().data[0]['id']
+            }
+            print(f"Dados para inserção no Supabase: {turma_data}")
+            turma = supabase.table('turmas').insert(turma_data).execute().data[0]
+            print(f"Turma criada com sucesso: {turma}")
             return jsonify({
-                'id': matricula['id'],
-                'studentId': matricula['aluno_id'],
-                'classId': matricula['turma_id']
+                'id': turma['id'],
+                'name': turma['nome'],
+                'type': data['type'],
+                'grades': turma['faixa_etaria'],
+                'day': turma['dia_semana'],
+                'period': turma['periodo'],
+                'capacity': turma['capacidade'],
+                'polo_name': data['polo_name']
             })
         except Exception as e:
-            print(f"Erro em manage_matriculas POST: {str(e)}")
+            print(f"Erro em criar turma (POST): {str(e)}")
             return jsonify({'error': str(e)}), 500
+
+@app.route('/api/turmas/<id>', methods=['PATCH'])
+def update_turma(id):
+    print(f"Requisição recebida para /api/turmas/{id} com método PATCH")
+    user = get_current_user()
+    if not user:
+        print("Erro: Usuário não autenticado em /api/turmas/<id>")
+        return jsonify({'error': 'Unauthorized'}), 401
+    try:
+        data = request.json
+        print(f"Dados recebidos para atualização: {data}")
+        update_data = {
+            'nome': data.get('name'),
+            'faixa_etaria': data.get('grades'),  # Já é um array vindo do frontend
+            'dia_semana': data.get('day'),
+            'periodo': data.get('period'),
+            'capacidade': int(data.get('capacity'))
+        }
+        # Remover campos que não devem ser atualizados se não fornecidos
+        update_data = {k: v for k, v in update_data.items() if v is not None}
+        print(f"Dados para atualização no Supabase: {update_data}")
+        
+        response = supabase.table('turmas').update(update_data).eq('id', id).execute()
+        if not response.data:
+            print(f"Turma com ID {id} não encontrada no Supabase")
+            return jsonify({'error': 'Turma não encontrada'}), 404
+        
+        print(f"Turma com ID {id} atualizada com sucesso")
+        return jsonify({'message': 'Turma atualizada com sucesso'})
+    except Exception as e:
+        print(f"Erro em update_turma: {str(e)}")
+        return jsonify({'error': str(e)}), 500
+
+@app.route('/api/turmas/<id>/unenroll', methods=['DELETE'])
+def unenroll_turma(id):
+    print(f"Requisição recebida para /api/turmas/{id}/unenroll com método DELETE")
+    user = get_current_user()
+    if not user:
+        print("Erro: Usuário não autenticado em /api/turmas/<id>/unenroll")
+        return jsonify({'error': 'Unauthorized'}), 401
+    try:
+        # Verificar se a turma existe
+        turma = supabase.table('turmas').select('id').eq('id', id).execute().data
+        if not turma:
+            print(f"Turma com ID {id} não encontrada")
+            return jsonify({'error': 'Turma não encontrada'}), 404
+
+        # Remover todas as matrículas da turma
+        supabase.table('matriculas').delete().eq('turma_id', id).execute()
+        print(f"Alunos desmatriculados da turma com ID {id}")
+        return jsonify({'message': 'Alunos desmatriculados com sucesso'})
+    except Exception as e:
+        print(f"Erro em unenroll_turma: {str(e)}")
+        return jsonify({'error': str(e)}), 500
 
 @app.route('/api/matriculas', methods=['GET', 'POST'])
 def manage_matriculas():

@@ -38,9 +38,33 @@ async function loadData() {
     }
 }
 
-function updateDashboard() {
-    // Atualizar Total de Alunos
+async function fetchPoloStudentsCount() {
+    try {
+        const response = await fetch('/api/alunos/polo_count', { credentials: 'include' });
+        if (!response.ok) {
+            const errorText = await response.text();
+            console.log(`Erro ao buscar contagem de alunos do polo: Status ${response.status}, Detalhes: ${errorText}`);
+            throw new Error(`Erro ao buscar contagem de alunos do polo: ${errorText}`);
+        }
+        const data = await response.json();
+        console.log('Contagem de alunos do polo retornada:', data);
+        return data.total_alunos_polo || 0;
+    } catch (error) {
+        console.log('Erro ao buscar contagem de alunos do polo:', error.message);
+        showToast('Erro ao carregar contagem de alunos do polo: ' + error.message, 'error', 'alert-circle');
+        return 0;
+    }
+}
+
+async function updateDashboard() {
+    // Atualizar Total de Alunos (geral)
     document.getElementById('total-students').textContent = students.length;
+
+    // Atualizar Total de Alunos do Polo Atual (para diretor, coordenador e monitor)
+    if (currentUserRole === 'diretor' || currentUserRole === 'coordenador' || currentUserRole === 'monitor') {
+        const poloStudentsCount = await fetchPoloStudentsCount();
+        document.getElementById('polo-students').textContent = poloStudentsCount;
+    }
 
     // Atualizar Turmas Ativas e Capacidade Média
     document.getElementById('total-classes').textContent = classes.length;

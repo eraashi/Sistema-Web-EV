@@ -38,10 +38,54 @@
                     </select>
                 </div>
             {% endif %}
-            <div class="flex-1 min-w-[200px]">
-                <label for="turma_unidade" class="block text-sm font-medium text-gray-700">Turma/Unidade</label>
-                <input type="text" id="turma_unidade" name="turma_unidade" class="mt-1 block w-full px-3 py-2 border border-gray-300 rounded-md shadow-sm focus:outline-none focus:ring-blue-500 focus:border-blue-500" placeholder="Digite a turma/unidade">
-            </div>
+            {% if user.cargo in ['admin', 'secretaria', 'coordenador'] %}
+                <div class="flex-1 min-w-[200px]">
+                    <label for="turma_unidade" class="block text-sm font-medium text-gray-700">Unidade</label>
+                    <select id="turma_unidade" name="turma_unidade" class="mt-1 block w-full px-3 py-2 border border-gray-300 rounded-md shadow-sm focus:outline-none focus:ring-blue-500 focus:border-blue-500">
+                        <option value="tudo">Tudo</option>
+                        <optgroup label="POLO IV (Saquarema)">
+                            <option value="E.M. ORGÉ FERREIRA DOS SANTOS">E.M. ORGÉ FERREIRA DOS SANTOS</option>
+                            <option value="C.M. GUSTAVO CAMPOS DA SILVEIRA">C.M. GUSTAVO CAMPOS DA SILVEIRA</option>
+                            <option value="E.M. JOSÉ BANDEIRA">E.M. JOSÉ BANDEIRA</option>
+                            <option value="E.M. PROFESSORA OSÍRIS PALMIER DA VEIGA">E.M. PROFESSORA OSÍRIS PALMIER DA VEIGA</option>
+                            <option value="E.M. PROFESSORA MARIA DE LOURDES MELO PAES BARRETO">E.M. PROFESSORA MARIA DE LOURDES MELO PAES BARRETO</option>
+                            <option value="E.M. BELINO CATHARINO DE SOUZA">E.M. BELINO CATHARINO DE SOUZA</option>
+                        </optgroup>
+                        <optgroup label="POLO I (Porto da Roça)">
+                            <option value="E.M. ANÍZIA ROSA DE OLIVEIRA COUTINHO">E.M. ANÍZIA ROSA DE OLIVEIRA COUTINHO</option>
+                            <option value="E.M. LUCIANA SANTANA COUTINHO">E.M. LUCIANA SANTANA COUTINHO</option>
+                            <option value="E.M. RUBENS DE LIMA CAMPOS">E.M. RUBENS DE LIMA CAMPOS</option>
+                            <option value="E.M. VALTEMIR JOSÉ DA COSTA">E.M. VALTEMIR JOSÉ DA COSTA</option>
+                            <option value="E.M. JOÃO MACHADO DA CUNHA">E.M. JOÃO MACHADO DA CUNHA</option>
+                            <option value="E.M. JARDIM IPITANGAS">E.M. JARDIM IPITANGAS</option>
+                            <option value="E.M. LÚCIO NUNES">E.M. LÚCIO NUNES</option>
+                            <option value="E.M. MANOEL MUNIZ DA SILVA">E.M. MANOEL MUNIZ DA SILVA</option>
+                            <option value="E.M. MARGARIDA ROSA DE AMORIM">E.M. MARGARIDA ROSA DE AMORIM</option>
+                            <option value="E.M. ELCIRA DE OLIVEIRA COUTINHO">E.M. ELCIRA DE OLIVEIRA COUTINHO</option>
+                            <option value="E.M. BEATRIZ AMARAL">E.M. BEATRIZ AMARAL</option>
+                            <option value="C.M.E. MENALDO CARLOS DE MAGALHÃES">C.M.E. MENALDO CARLOS DE MAGALHÃES</option>
+                            <option value="C.M.E. PADRE MANUEL">C.M.E. PADRE MANUEL</option>
+                            <option value="E.M. PROFESSOR FRANCISCO VIGNOLI">E.M. PROFESSOR FRANCISCO VIGNOLI</option>
+                            <option value="E.M. PAULO LUIZ BARROSO OLIVEIRA">E.M. PAULO LUIZ BARROSO OLIVEIRA</option>
+                            <option value="E.M. PREFEITO WALQUIDES DE SOUZA LIMA">E.M. PREFEITO WALQUIDES DE SOUZA LIMA</option>
+                            <option value="E.M. VILATUR">E.M. VILATUR</option>
+                            <option value="E.M. THEÓFILO D'ÁVILA">E.M. THEÓFILO D'ÁVILA</option>
+                        </optgroup>
+                        <optgroup label="POLO III (Jaconé)">
+                            <option value="E.M. ISMÊNIA DE BARROS BARROSO">E.M. ISMÊNIA DE BARROS BARROSO</option>
+                        </optgroup>
+                        <optgroup label="POLO II (Sampaio Correia)">
+                            <option value="E.M. EDILSON VIGNOLI MARINS">E.M. EDILSON VIGNOLI MARINS</option>
+                            <option value="E.M. MARIA LUIZA DE AMORIM MENDONÇA">E.M. MARIA LUIZA DE AMORIM MENDONÇA</option>
+                            <option value="E.M. JOÃO LAUREANO DA SILVA">E.M. JOÃO LAUREANO DA SILVA</option>
+                            <option value="C.M.E. JURANDIR DA SILVA MELO">C.M.E. JURANDIR DA SILVA MELO</option>
+                            <option value="E.M. SEBASTIÃO MANOEL DOS REIS">E.M. SEBASTIÃO MANOEL DOS REIS</option>
+                            <option value="E.M. VEREADOR IVAN DA SILVA MELO">E.M. VEREADOR IVAN DA SILVA MELO</option>
+                            <option value="E.M. EDILÊNIO SILVA DE SOUZA">E.M. EDILÊNIO SILVA DE SOUZA</option>
+                        </optgroup>
+                    </select>
+                </div>
+            {% endif %}
             <div class="flex-1 min-w-[150px]">
                 <label for="genero" class="block text-sm font-medium text-gray-700">Gênero</label>
                 <select id="genero" name="genero" class="mt-1 block w-full px-3 py-2 border border-gray-300 rounded-md shadow-sm focus:outline-none focus:ring-blue-500 focus:border-blue-500">
@@ -59,26 +103,20 @@
                     <option value="Sem Deficiência">Sem Deficiência</option>
                 </select>
             </div>
-            {% if user.cargo in ['admin', 'secretaria', 'coordenador'] %}
-                <div class="flex-1 min-w-[300px]">
-                    <label for="unidade" class="block text-sm font-medium text-gray-700">Unidade</label>
-                    <input type="text" id="unidade" name="unidade" class="mt-1 block w-full px-3 py-2 border border-gray-300 rounded-md shadow-sm focus:outline-none focus:ring-blue-500 focus:border-blue-500" placeholder="Digite a unidade">
-                </div>
-            {% endif %}
             <div class="flex-1 min-w-[150px]">
                 <label for="etapa" class="block text-sm font-medium text-gray-700">Etapa</label>
                 <select id="etapa" name="etapa" class="mt-1 block w-full px-3 py-2 border border-gray-300 rounded-md shadow-sm focus:outline-none focus:ring-blue-500 focus:border-blue-500">
                     <option value="tudo">Tudo</option>
-                    <option value="4">4</option>
-                    <option value="5">5</option>
-                    <option value="6">6</option>
-                    <option value="7">7</option>
-                    <option value="8">8</option>
-                    <option value="9">9</option>
+                    <option value="4">4º Ano</option>
+                    <option value="5">5º Ano</option>
+                    <option value="6">6º Ano</option>
+                    <option value="7">7º Ano</option>
+                    <option value="8">8º Ano</option>
+                    <option value="9">9º Ano</option>
                 </select>
             </div>
             <div class="flex-1 min-w-[150px]">
-                <label for="status" class="block text-sm font-medium text-gray-700">Status</label>
+                <label for="status" class="block text-sm font-medium text-gray-700">Enturmados Escola Viva</label>
                 <select id="status" name="status" class="mt-1 block w-full px-3 py-2 border border-gray-300 rounded-md shadow-sm focus:outline-none focus:ring-blue-500 focus:border-blue-500">
                     <option value="tudo">Tudo</option>
                     <option value="complete">Completo</option>
@@ -104,24 +142,368 @@
                     <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">Nome</th>
                     <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">Matrícula</th>
                     <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">Polo</th>
-                    <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">Turma/Unidade</th>
+                    <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">Turmas</th>
                     <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">Gênero</th>
                     <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">PCD</th>
                     <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">Unidade</th>
                     <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">Etapa</th>
-                    <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">Status</th>
+                    <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">Enturmados Escola Viva</th>
+                    {% if user.cargo in ['admin', 'secretaria', 'coordenador'] %}
+                        <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">Ações</th>
+                    {% endif %}
                 </tr>
             </thead>
             <tbody id="student-table-body" class="divide-y divide-gray-200">
-                <tr><td colspan="9" class="px-6 py-4 text-center text-gray-500">Ajuste os filtros e clique em "Pesquisar" para listar os alunos.</td></tr>
+                <tr>
+                    <td colspan="{% if user.cargo in ['admin', 'secretaria', 'coordenador'] %}10{% else %}9{% endif %}" class="px-6 py-4 text-center text-gray-500">
+                        Ajuste os filtros e clique em "Pesquisar" para listar os alunos.
+                    </td>
+                </tr>
             </tbody>
         </table>
         <!-- Controle de paginação no final -->
         <div id="pagination" class="py-4 px-6"></div>
     </div>
 </div>
+
+<!-- Container para Toasts -->
+<div id="custom-toast-container"></div>
+
+<!-- Modal de Edição -->
+<div id="edit-student-modal" class="modal">
+    <div class="modal-content">
+        <h2 class="modal-title">Editar Aluno</h2>
+        <form id="edit-student-form">
+            <input type="hidden" id="edit-student-id" name="id">
+            <div class="modal-grid">
+                <div class="modal-field">
+                    <label for="edit-name" class="modal-label">Nome</label>
+                    <input type="text" id="edit-name" name="name" class="modal-input" required>
+                </div>
+                <div class="modal-field">
+                    <label for="edit-polo-name" class="modal-label">Polo</label>
+                    <select id="edit-polo-name" name="polo_name" class="modal-input">
+                        <option value="POLO I (Porto da Roça)">POLO I (Porto da Roça)</option>
+                        <option value="POLO II (Sampaio Correia)">POLO II (Sampaio Correia)</option>
+                        <option value="Polo III (Jaconé)">Polo III (Jaconé)</option>
+                        <option value="Polo IV (Saquarema)">Polo IV (Saquarema)</option>
+                    </select>
+                </div>
+                <div class="modal-field">
+                    <label for="edit-unidade" class="modal-label">Unidade</label>
+                    <select id="edit-unidade" name="unidade" class="modal-input">
+                        <optgroup label="POLO IV (Saquarema)">
+                            <option value="E.M. ORGÉ FERREIRA DOS SANTOS">E.M. ORGÉ FERREIRA DOS SANTOS</option>
+                            <option value="C.M. GUSTAVO CAMPOS DA SILVEIRA">C.M. GUSTAVO CAMPOS DA SILVEIRA</option>
+                            <option value="E.M. JOSÉ BANDEIRA">E.M. JOSÉ BANDEIRA</option>
+                            <option value="E.M. PROFESSORA OSÍRIS PALMIER DA VEIGA">E.M. PROFESSORA OSÍRIS PALMIER DA VEIGA</option>
+                            <option value="E.M. PROFESSORA MARIA DE LOURDES MELO PAES BARRETO">E.M. PROFESSORA MARIA DE LOURDES MELO PAES BARRETO</option>
+                            <option value="E.M. BELINO CATHARINO DE SOUZA">E.M. BELINO CATHARINO DE SOUZA</option>
+                        </optgroup>
+                        <optgroup label="POLO I (Porto da Roça)">
+                            <option value="E.M. ANÍZIA ROSA DE OLIVEIRA COUTINHO">E.M. ANÍZIA ROSA DE OLIVEIRA COUTINHO</option>
+                            <option value="E.M. LUCIANA SANTANA COUTINHO">E.M. LUCIANA SANTANA COUTINHO</option>
+                            <option value="E.M. RUBENS DE LIMA CAMPOS">E.M. RUBENS DE LIMA CAMPOS</option>
+                            <option value="E.M. VALTEMIR JOSÉ DA COSTA">E.M. VALTEMIR JOSÉ DA COSTA</option>
+                            <option value="E.M. JOÃO MACHADO DA CUNHA">E.M. JOÃO MACHADO DA CUNHA</option>
+                            <option value="E.M. JARDIM IPITANGAS">E.M. JARDIM IPITANGAS</option>
+                            <option value="E.M. LÚCIO NUNES">E.M. LÚCIO NUNES</option>
+                            <option value="E.M. MANOEL MUNIZ DA SILVA">E.M. MANOEL MUNIZ DA SILVA</option>
+                            <option value="E.M. MARGARIDA ROSA DE AMORIM">E.M. MARGARIDA ROSA DE AMORIM</option>
+                            <option value="E.M. ELCIRA DE OLIVEIRA COUTINHO">E.M. ELCIRA DE OLIVEIRA COUTINHO</option>
+                            <option value="E.M. BEATRIZ AMARAL">E.M. BEATRIZ AMARAL</option>
+                            <option value="C.M.E. MENALDO CARLOS DE MAGALHÃES">C.M.E. MENALDO CARLOS DE MAGALHÃES</option>
+                            <option value="C.M.E. PADRE MANUEL">C.M.E. PADRE MANUEL</option>
+                            <option value="E.M. PROFESSOR FRANCISCO VIGNOLI">E.M. PROFESSOR FRANCISCO VIGNOLI</option>
+                            <option value="E.M. PAULO LUIZ BARROSO OLIVEIRA">E.M. PAULO LUIZ BARROSO OLIVEIRA</option>
+                            <option value="E.M. PREFEITO WALQUIDES DE SOUZA LIMA">E.M. PREFEITO WALQUIDES DE SOUZA LIMA</option>
+                            <option value="E.M. VILATUR">E.M. VILATUR</option>
+                            <option value="E.M. THEÓFILO D'ÁVILA">E.M. THEÓFILO D'ÁVILA</option>
+                        </optgroup>
+                        <optgroup label="POLO III (Jaconé)">
+                            <option value="E.M. ISMÊNIA DE BARROS BARROSO">E.M. ISMÊNIA DE BARROS BARROSO</option>
+                        </optgroup>
+                        <optgroup label="POLO II (Sampaio Correia)">
+                            <option value="E.M. EDILSON VIGNOLI MARINS">E.M. EDILSON VIGNOLI MARINS</option>
+                            <option value="E.M. MARIA LUIZA DE AMORIM MENDONÇA">E.M. MARIA LUIZA DE AMORIM MENDONÇA</option>
+                            <option value="E.M. JOÃO LAUREANO DA SILVA">E.M. JOÃO LAUREANO DA SILVA</option>
+                            <option value="C.M.E. JURANDIR DA SILVA MELO">C.M.E. JURANDIR DA SILVA MELO</option>
+                            <option value="E.M. SEBASTIÃO MANOEL DOS REIS">E.M. SEBASTIÃO MANOEL DOS REIS</option>
+                            <option value="E.M. VEREADOR IVAN DA SILVA MELO">E.M. VEREADOR IVAN DA SILVA MELO</option>
+                            <option value="E.M. EDILÊNIO SILVA DE SOUZA">E.M. EDILÊNIO SILVA DE SOUZA</option>
+                        </optgroup>
+                    </select>
+                </div>
+                <div class="modal-field">
+                    <label for="edit-genero" class="modal-label">Gênero</label>
+                    <select id="edit-genero" name="genero" class="modal-input">
+                        <option value="Masculino">Masculino</option>
+                        <option value="Feminino">Feminino</option>
+                        <option value="Outro">Outro</option>
+                    </select>
+                </div>
+                <div class="modal-field">
+                    <label for="edit-pcd" class="modal-label">PCD</label>
+                    <select id="edit-pcd" name="pcd" class="modal-input">
+                        <option value="Com Deficiência">Com Deficiência</option>
+                        <option value="Sem Deficiência">Sem Deficiência</option>
+                    </select>
+                </div>
+                <div class="modal-field">
+                    <label for="edit-etapa" class="modal-label">Etapa</label>
+                    <select id="edit-etapa" name="etapa" class="modal-input">
+                        <option value="4º Ano">4º Ano</option>
+                        <option value="5º Ano">5º Ano</option>
+                        <option value="6º Ano">6º Ano</option>
+                        <option value="7º Ano">7º Ano</option>
+                        <option value="8º Ano">8º Ano</option>
+                        <option value="9º Ano">9º Ano</option>
+                    </select>
+                </div>
+                <div class="modal-field">
+                    <label for="edit-turno" class="modal-label">Turno</label>
+                    <select id="edit-turno" name="turno" class="modal-input">
+                        <option value="manha">Manhã</option>
+                        <option value="tarde">Tarde</option>
+                        <option value="integral">Integral</option>
+                    </select>
+                </div>
+                <div class="modal-field">
+                    <label for="edit-data-nascimento" class="modal-label">Data de Nascimento</label>
+                    <input type="date" id="edit-data-nascimento" name="data_nascimento" class="modal-input">
+                </div>
+            </div>
+            <div class="modal-footer">
+                <button type="button" onclick="closeEditModal()" class="modal-button modal-button-cancel">Cancelar</button>
+                <button type="submit" class="modal-button modal-button-save">Salvar</button>
+            </div>
+        </form>
+        <div class="attention-box">
+            <p class="attention-title"><strong>Atenção!</strong></p>
+            <p class="attention-text">Após editar qualquer dado do aluno, será necessário realizar a matrícula dele novamente nas turmas do programa Escola Viva. Para isso, acesse: "Enturmar Alunos" nas opções do lado esquerdo.</p>
+        </div>
+    </div>
+</div>
+
+<style>
+/* Estilo do Modal */
+.modal {
+    display: none;
+    position: fixed;
+    z-index: 1000;
+    left: 0;
+    top: 0;
+    width: 100%;
+    height: 100%;
+    overflow: auto;
+    background-color: rgba(0, 0, 0, 0.5);
+}
+
+.modal-content {
+    background-color: #fff;
+    margin: auto;
+    padding: 20px;
+    border: 1px solid #888;
+    width: 80%;
+    max-width: 800px;
+    border-radius: 8px;
+    position: relative;
+    top: 50%;
+    transform: translateY(-50%);
+}
+
+.modal-title {
+    font-size: 1.25rem;
+    font-weight: 600;
+    margin-bottom: 20px;
+}
+
+.modal-grid {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 16px;
+}
+
+.modal-field {
+    display: flex;
+    flex-direction: column;
+}
+
+.modal-label {
+    font-size: 0.875rem;
+    font-weight: 500;
+    color: #374151;
+    margin-bottom: 4px;
+}
+
+.modal-input {
+    width: 100%;
+    padding: 8px;
+    border: 1px solid #d1d5db;
+    border-radius: 4px;
+    font-size: 1rem;
+    outline: none;
+}
+
+.modal-input:focus {
+    border-color: #3b82f6;
+    box-shadow: 0 0 0 2px rgba(59, 130, 246, 0.5);
+}
+
+.modal-footer {
+    margin-top: 24px;
+    display: flex;
+    justify-content: flex-end;
+    gap: 8px;
+}
+
+.modal-button {
+    padding: 8px 16px;
+    border-radius: 4px;
+    font-size: 1rem;
+    cursor: pointer;
+}
+
+.modal-button-cancel {
+    background-color: #d1d5db;
+    color: #374151;
+}
+
+.modal-button-cancel:hover {
+    background-color: #9ca3af;
+}
+
+.modal-button-save {
+    background-color: #2563eb;
+    color: #fff;
+}
+
+.modal-button-save:hover {
+    background-color: #1d4ed8;
+}
+
+/* Estilo do Botão Editar */
+.edit-button {
+    background-color: #f59e0b;
+    color: #fff;
+    padding: 4px 8px;
+    border-radius: 4px;
+    display: inline-flex;
+    align-items: center;
+    gap: 4px;
+    font-size: 14px;
+    border: none;
+    cursor: pointer;
+    visibility: visible !important;
+}
+
+.edit-button:hover {
+    background-color: #d97706;
+}
+
+.edit-button i {
+    width: 16px;
+    height: 16px;
+}
+
+/* Estilo da Div de Atenção */
+.attention-box {
+    margin-top: 20px;
+    padding: 12px;
+    border: 2px solid #93c5fd; /* Contorno azul */
+    border-radius: 8px;
+    background-color: rgba(245, 158, 11, 0.1); /* Laranja quase transparente */
+}
+
+.attention-title {
+    font-size: 1rem;
+    font-weight: 600;
+    color: #1f2937;
+    margin-bottom: 8px;
+}
+
+.attention-text {
+    font-size: 0.875rem;
+    color: #4b5563;
+    line-height: 1.5;
+}
+
+/* Toast Animation */
+@keyframes fadeInOut {
+    0% { opacity: 0; transform: translateY(10px); }
+    10% { opacity: 1; transform: translateY(0); }
+    90% { opacity: 1; transform: translateY(0); }
+    100% { opacity: 0; transform: translateY(10px); }
+}
+
+/* Toast Container */
+#custom-toast-container {
+    position: fixed !important;
+    bottom: 16px !important;
+    right: 16px !important;
+    z-index: 10001 !important; /* z-index maior que o modal (1000) */
+    display: flex !important;
+    flex-direction: column !important;
+    gap: 8px !important;
+}
+
+/* Toast Styles */
+#custom-toast-container .custom-toast {
+    display: flex !important;
+    align-items: center !important;
+    justify-content: space-between !important;
+    min-width: 200px !important;
+    padding: 6px 10px !important;
+    border-radius: 6px !important;
+    box-shadow: 0 2px 4px rgba(0, 0, 0, 0.1) !important;
+    color: white !important;
+    font-size: 13px !important;
+    line-height: 1.2 !important;
+}
+
+#custom-toast-container .custom-toast-success {
+    background-color: #22c55e !important;
+    animation: fadeInOut 3s ease-in-out forwards !important;
+}
+
+#custom-toast-container .custom-toast-error {
+    background-color: #ef4444 !important;
+    animation: fadeInOut 3s ease-in-out forwards !important;
+}
+
+#custom-toast-container .custom-toast-warning {
+    background-color: #f59e0b !important;
+    animation: fadeInOut 5s ease-in-out forwards !important;
+}
+
+#custom-toast-container .custom-toast-icon {
+    margin-right: 6px !important;
+    flex-shrink: 0 !important;
+}
+
+#custom-toast-container .custom-toast-message {
+    flex: 1 !important;
+    overflow: hidden !important;
+    text-overflow: ellipsis !important;
+    white-space: nowrap !important;
+}
+
+#custom-toast-container .custom-toast-close {
+    background: none !important;
+    border: none !important;
+    color: white !important;
+    font-size: 16px !important;
+    cursor: pointer !important;
+    padding: 0 6px !important;
+    flex-shrink: 0 !important;
+}
+</style>
 {% endblock %}
 
 {% block scripts %}
+<script>
+    // Passar o cargo do usuário logado para o JavaScript
+    const currentUserRole = "{{ user.cargo }}";
+</script>
 <script src="/static/js/student_list.js"></script>
 {% endblock %}
