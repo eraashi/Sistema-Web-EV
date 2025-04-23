@@ -3,22 +3,20 @@ from supabase import create_client
 from dotenv import load_dotenv
 import os
 from retrying import retry
-from flask_session import Session
 
 app = Flask(__name__)
 load_dotenv()
 app.secret_key = os.getenv('FLASK_SECRET_KEY')
 
-# Configurar o Flask-Session para usar o sistema de arquivos
-app.config['SESSION_TYPE'] = 'filesystem'
+# Configurar o Flask para usar cookies de sessão (armazenados no cliente)
+app.config['SESSION_TYPE'] = 'null'  # Não usa armazenamento no servidor
 app.config['SESSION_PERMANENT'] = True
 app.config['PERMANENT_SESSION_LIFETIME'] = 3600  # 1 hora
 app.config['SESSION_COOKIE_HTTPONLY'] = True
 app.config['SESSION_COOKIE_SAMESITE'] = 'Lax'
 app.config['SESSION_COOKIE_SECURE'] = False  # Alterar para True se usar HTTPS
-app.config['SESSION_FILE_DIR'] = os.path.join(os.getcwd(), 'flask_session')
-app.config['SESSION_COOKIE_DOMAIN'] = '127.0.0.1'  # Definir explicitamente o domínio
-Session(app)
+# Remover SESSION_COOKIE_DOMAIN para permitir que o Flask determine o domínio automaticamente
+# app.config['SESSION_COOKIE_DOMAIN'] = '127.0.0.1'
 
 # Configurar Supabase
 supabase = create_client(os.getenv('SUPABASE_URL'), os.getenv('SUPABASE_ANON_KEY'))

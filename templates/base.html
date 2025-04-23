@@ -74,7 +74,10 @@
 
     <script>
         function logout() {
-            fetch('/logout', { method: 'POST' })
+            fetch('/logout', { 
+                method: 'POST',
+                credentials: 'include'  // Enviar cookies de sessão
+            })
                 .then(() => window.location.href = '/login')
                 .catch(error => alert('Erro: ' + error.message));
         }

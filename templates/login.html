@@ -34,7 +34,7 @@
                     method: 'POST',
                     headers: { 'Content-Type': 'application/json' },
                     body: JSON.stringify({ cpf, password }),
-                    credentials: 'include'  // Adicionar para enviar cookies de sessão
+                    credentials: 'include'  // Enviar cookies de sessão
                 });
                 const data = await response.json();
 
