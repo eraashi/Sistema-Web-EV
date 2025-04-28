@@ -44,12 +44,22 @@
                     <i data-lucide="chart-bar" class="h-5 w-5 mr-2"></i>
                     Estatísticas
                 </a>
-                <a href="/reports_new" class="flex items-center p-4 hover:bg-blue-700 {% if request.path == '/reports_new' %}bg-blue-700{% endif %}">
-                    <svg class="h-5 w-5 mr-2" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 5H7a2 2 0 00-2 2v12a2 2 0 002 2h10a2 2 0 002-2V7a2 2 0 00-2-2h-2M9 5a2 2 0 002 2h2a2 2 0 002-2M9 5a2 2 0 012-2h2a2 2 0 012 2"/>
-                    </svg>
-                    Relatórios
-                </a>
+                <div class="relative">
+                    <a class="flex items-center p-4 hover:bg-blue-700 cursor-pointer {% if request.path == '/reports_presences' or request.path == '/reports_occurrences' %}bg-blue-700{% endif %}">
+                        <svg class="h-5 w-5 mr-2" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 5H7a2 2 0 00-2 2v12a2 2 0 002 2h10a2 2 0 002-2V7a2 2 0 00-2-2h-2M9 5a2 2 0 002 2h2a2 2 0 002-2M9 5a2 2 0 012-2h2a2 2 0 012 2"/>
+                        </svg>
+                        Relatórios
+                    </a>
+                    <div class="dropdown-menu">
+                        <a href="/reports_presences" class="flex items-center p-4 text-white hover:bg-blue-700 {% if request.path == '/reports_presences' %}bg-blue-700{% endif %}">
+                            Presenças
+                        </a>
+                        <a href="/reports_occurrences" class="flex items-center p-4 text-white hover:bg-blue-700 {% if request.path == '/reports_occurrences' %}bg-blue-700{% endif %}">
+                            Ocorrências
+                        </a>
+                    </div>
+                </div>
             </nav>
             <div class="p-4 text-sm">Usuário: {{ user.nome if user else 'Admin' }}</div>
         </div>
@@ -72,6 +82,36 @@
         <!-- Toasts will be dynamically added aqui -->
     </div>
 
+    <style>
+    /* Estilo do Dropdown no Navbar */
+    .dropdown-menu {
+        display: none;
+        position: absolute;
+        background-color: #1e40af; /* Mesmo fundo azul escuro do navbar */
+        width: 100%; /* Mesma largura do navbar */
+        left: 0; /* Alinha à esquerda do botão pai */
+        z-index: 1;
+    }
+
+    .dropdown-menu a {
+        display: flex;
+        align-items: center;
+        padding: 1rem; /* Mesmo padding dos outros botões */
+        color: #ffffff; /* Texto branco */
+        text-decoration: none;
+        font-size: 1rem; /* Mesmo tamanho de fonte */
+        transition: background-color 0.2s ease;
+    }
+
+    .dropdown-menu a:hover {
+        background-color: #1d4ed8; /* Mesmo hover dos outros botões */
+    }
+
+    .dropdown-menu.show {
+        display: block;
+    }
+    </style>
+
     <script>
         function logout() {
             fetch('/logout', { 
@@ -81,6 +121,25 @@
                 .then(() => window.location.href = '/login')
                 .catch(error => alert('Erro: ' + error.message));
         }
+
+        document.addEventListener('DOMContentLoaded', () => {
+            const dropdownContainers = document.querySelectorAll('.relative');
+            dropdownContainers.forEach(container => {
+                const button = container.querySelector('a');
+                const dropdownMenu = container.querySelector('.dropdown-menu');
+                button.addEventListener('click', (e) => {
+                    e.preventDefault();
+                    e.stopPropagation();
+                    dropdownMenu.classList.toggle('show');
+                });
+
+                document.addEventListener('click', (e) => {
+                    if (!container.contains(e.target)) {
+                        dropdownMenu.classList.remove('show');
+                    }
+                });
+            });
+        });
     </script>
     {% block scripts %}{% endblock %}
 </body>

@@ -96,6 +96,24 @@ def reports_new():
     print(f"Usuário autenticado em /reports_new: {user['id']}")
     return render_template('reports_new.html', user=user)
 
+@app.route('/reports_presences')
+def reports_presences():
+    user = get_current_user()
+    if not user:
+        print("Nenhum usuário autenticado em /reports_presences, redirecionando para login")
+        return redirect(url_for('login'))
+    print(f"Usuário autenticado em /reports_presences: {user['id']}")
+    return render_template('reports_presences.html', user=user)
+
+@app.route('/reports_occurrences')
+def reports_occurrences():
+    user = get_current_user()
+    if not user:
+        print("Nenhum usuário autenticado em /reports_occurrences, redirecionando para login")
+        return redirect(url_for('login'))
+    print(f"Usuário autenticado em /reports_occurrences: {user['id']}")
+    return render_template('reports_occurrences.html', user=user)
+
 @app.route('/classes')
 def classes():
     user = get_current_user()
@@ -174,12 +192,7 @@ def get_presencas():
 
         result = []
         for presenca in presencas:
-            # Verificar se turma_id é None ou se a relação com turmas não foi encontrada
-            if not presenca['turma_id'] or 'turmas' not in presenca or presenca['turmas'] is None:
-                print(f"Ignorando presença com turma_id inválido ou ausente: {presenca['id']}, turma_id: {presenca['turma_id']}")
-                continue
-
-            turma = presenca['turmas']
+            turma = presenca.get('turmas', {})
             polo = turma.get('polos', {}) if turma else {}
             result.append({
                 'id': presenca['id'],
@@ -230,12 +243,7 @@ def get_ocorrencias():
 
         result = []
         for ocorrencia in ocorrencias:
-            # Verificar se turma_id é None ou se a relação com turmas não foi encontrada
-            if not ocorrencia['turma_id'] or 'turmas' not in ocorrencia or ocorrencia['turmas'] is None:
-                print(f"Ignorando ocorrência com turma_id inválido ou ausente: {ocorrencia['id']}, turma_id: {ocorrencia['turma_id']}")
-                continue
-
-            turma = ocorrencia['turmas']
+            turma = ocorrencia.get('turmas', {})
             polo = turma.get('polos', {}) if turma else {}
             print(f"Dados da turma para ocorrência {ocorrencia['id']}: {turma}")
             result.append({

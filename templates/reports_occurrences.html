@@ -1,0 +1,21 @@
+{% extends 'base.html' %}
+
+{% block title %}Ocorrências{% endblock %}
+
+{% block header %}Ocorrências{% endblock %}
+
+{% block content %}
+<div class="space-y-8">
+    <!-- Seção de Ocorrências -->
+    <div>
+        <h2 class="text-lg font-semibold mb-4">Ocorrências</h2>
+        <div id="occurrences-section" class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
+            <!-- Cards de ocorrências serão adicionados dinamicamente aqui -->
+        </div>
+    </div>
+</div>
+{% endblock %}
+
+{% block scripts %}
+<script src="/static/js/reports_occurrences.js?v=1"></script>
+{% endblock %}
