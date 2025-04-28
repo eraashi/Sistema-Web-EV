@@ -174,7 +174,12 @@ def get_presencas():
 
         result = []
         for presenca in presencas:
-            turma = presenca.get('turmas', {})
+            # Verificar se turma_id é None ou se a relação com turmas não foi encontrada
+            if not presenca['turma_id'] or 'turmas' not in presenca or presenca['turmas'] is None:
+                print(f"Ignorando presença com turma_id inválido ou ausente: {presenca['id']}, turma_id: {presenca['turma_id']}")
+                continue
+
+            turma = presenca['turmas']
             polo = turma.get('polos', {}) if turma else {}
             result.append({
                 'id': presenca['id'],
@@ -225,7 +230,12 @@ def get_ocorrencias():
 
         result = []
         for ocorrencia in ocorrencias:
-            turma = ocorrencia.get('turmas', {})
+            # Verificar se turma_id é None ou se a relação com turmas não foi encontrada
+            if not ocorrencia['turma_id'] or 'turmas' not in ocorrencia or ocorrencia['turmas'] is None:
+                print(f"Ignorando ocorrência com turma_id inválido ou ausente: {ocorrencia['id']}, turma_id: {ocorrencia['turma_id']}")
+                continue
+
+            turma = ocorrencia['turmas']
             polo = turma.get('polos', {}) if turma else {}
             print(f"Dados da turma para ocorrência {ocorrencia['id']}: {turma}")
             result.append({
