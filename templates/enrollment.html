@@ -10,7 +10,7 @@
         <!-- Primeira Div: Lista de Turmas -->
         <div class="border border-blue-400 rounded-lg p-6 bg-white md:w-full" style="flex: 1; min-width: 0; height: calc(100vh - 120px);">
             <h2 class="text-lg font-semibold mb-4" style="height: 32px;">Turmas - Selecione uma turma</h2>
-            <div style="height: 160px; margin-bottom: 16px;">
+            <div style="margin-bottom: 16px;">
                 <div class="flex space-x-2 mb-4" style="height: 40px;">
                     <button id="filter-cognitiva" class="bg-blue-600 text-white px-4 py-2 rounded-md hover:bg-blue-700 flex-1">Cognitivas</button>
                     <button id="filter-motora" class="bg-gray-200 text-gray-700 px-4 py-2 rounded-md hover:bg-gray-300 flex-1">Motoras</button>
@@ -24,23 +24,38 @@
                     >
                     <i data-lucide="search" class="absolute left-3 top-1/2 -translate-y-1/2 h-5 w-5 text-gray-400"></i>
                 </div>
-                <div class="flex gap-4" style="height: 40px;">
-                    <select id="day-filter" class="w-full px-3 py-2 border border-gray-300 rounded-md shadow-sm focus:outline-none focus:ring-blue-500 focus:border-blue-500">
-                        <option value="">TODAS</option>
+                <div class="filter-grid">
+                    <select id="day-filter" class="filter-select px-2 py-1 border border-gray-300 rounded-md shadow-sm focus:outline-none focus:ring-blue-500 focus:border-blue-500">
+                        <option value="">Dia da Semana</option>
                         <option value="seg">Segunda</option>
                         <option value="ter">Terça</option>
                         <option value="qua">Quarta</option>
                         <option value="qui">Quinta</option>
                         <option value="sex">Sexta</option>
                     </select>
-                    <select id="period-filter" class="w-full px-3 py-2 border border-gray-300 rounded-md shadow-sm focus:outline-none focus:ring-blue-500 focus:border-blue-500">
-                        <option value="">TODOS</option>
+                    <select id="period-filter" class="filter-select px-2 py-1 border border-gray-300 rounded-md shadow-sm focus:outline-none focus:ring-blue-500 focus:border-blue-500">
+                        <option value="">Turno</option>
                         <option value="manha">Manhã</option>
                         <option value="tarde">Tarde</option>
                     </select>
+                    {% if user.cargo in ['admin', 'secretaria'] %}
+                        <select id="polo-filter" class="filter-select px-2 py-1 border border-gray-300 rounded-md shadow-sm focus:outline-none focus:ring-blue-500 focus:border-blue-500">
+                            <option value="">Polo</option>
+                            <option value="POLO I (Porto da Roça)">POLO I (Porto da Roça)</option>
+                            <option value="POLO II (Sampaio Correia)">POLO II (Sampaio Correia)</option>
+                            <option value="Polo III (Jaconé)">Polo III (Jaconé)</option>
+                            <option value="Polo IV (Saquarema)">Polo IV (Saquarema)</option>
+                        </select>
+                        <select id="grade-filter" class="filter-select px-2 py-1 border border-gray-300 rounded-md shadow-sm focus:outline-none focus:ring-blue-500 focus:border-blue-500">
+                            <option value="">Faixa Etária</option>
+                            <option value='["4", "5"]'>4º e 5º Ano</option>
+                            <option value='["6", "7"]'>6º e 7º Ano</option>
+                            <option value='["8", "9"]'>8º e 9º Ano</option>
+                        </select>
+                    {% endif %}
                 </div>
             </div>
-            <div id="class-list" style="height: calc(100% - 208px); overflow-y: auto;">
+            <div id="class-list" style="height: calc(100% - 256px); overflow-y: auto;">
                 <div class="text-center py-4 text-gray-500">Carregando turmas...</div>
             </div>
         </div>
@@ -78,7 +93,17 @@
                 >
                 <i data-lucide="search" class="absolute left-3 top-1/2 -translate-y-1/2 h-5 w-5 text-gray-400"></i>
             </div>
-            <div id="available-students" style="height: calc(100% - 112px); overflow-y: auto;">
+            <div class="relative mb-4" style="height: 40px;">
+                <input
+                    id="student-unit-filter"
+                    type="text"
+                    placeholder="Buscar alunos por unidade..."
+                    class="w-full p-2 pl-10 border border-gray-300 rounded-md shadow-sm focus:outline-none focus:ring-blue-500 focus:border-blue-500"
+                    disabled
+                >
+                <i data-lucide="school" class="absolute left-3 top-1/2 -translate-y-1/2 h-5 w-5 text-gray-400"></i>
+            </div>
+            <div id="available-students" style="height: calc(100% - 152px); overflow-y: auto;">
                 <div class="text-center py-4 text-gray-500">Nenhuma turma selecionada.</div>
             </div>
         </div>
@@ -86,6 +111,31 @@
 </div>
 
 <style>
+    /* Estilo para o contêiner de filtros */
+    .filter-grid {
+        display: grid !important;
+        grid-template-columns: repeat(2, minmax(0, 1fr)) !important;
+        gap: 16px 8px !important; /* Espaço vertical: 16px, horizontal: 8px */
+        width: 100% !important;
+        min-width: 0 !important;
+    }
+
+    /* Estilo específico para os selects dentro da grade de filtros */
+    .filter-select {
+        width: 100% !important; /* Ocupa a largura total da célula da grade */
+        min-width: 0 !important; /* Evita que o select seja esticado */
+        box-sizing: border-box !important; /* Inclui padding e bordas na largura */
+    }
+
+    /* Ajusta o espaço horizontal entre os selects */
+    .filter-grid .filter-select:nth-child(odd) {
+        margin-right: 4px !important; /* Espaço à direita do select da esquerda */
+    }
+
+    .filter-grid .filter-select:nth-child(even) {
+        margin-left: 4px !important; /* Espaço à esquerda do select da direita */
+    }
+
     /* Toast Animation */
     @keyframes fadeInOut {
         0% { opacity: 0; transform: translateY(10px); }

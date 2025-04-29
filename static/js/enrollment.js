@@ -133,7 +133,7 @@ function extractStudentGrade(studentEtapa) {
 }
 
 function extractAcceptedGrades(grades) {
-    if (!grades) {
+    if (!grades) { // Corrige o erro de sintaxe removendo "Woche"
         return [];
     }
 
@@ -155,11 +155,20 @@ function extractAcceptedGrades(grades) {
     return gradeArray;
 }
 
+function arraysEqual(arr1, arr2) {
+    if (arr1.length !== arr2.length) return false;
+    const sortedArr1 = arr1.slice().sort();
+    const sortedArr2 = arr2.slice().sort();
+    return sortedArr1.every((value, index) => value === sortedArr2[index]);
+}
+
 function filterClasses(type) {
     const search = document.getElementById('class-search').value.toLowerCase();
     const typeFilter = type || (document.querySelector('button.bg-blue-600')?.innerText.toLowerCase() === 'cognitivas' ? 'cognitiva' : 'motora');
     const dayFilter = document.getElementById('day-filter').value;
     const periodFilter = document.getElementById('period-filter').value;
+    const poloFilter = document.getElementById('polo-filter') ? document.getElementById('polo-filter').value : '';
+    const gradeFilter = document.getElementById('grade-filter') ? document.getElementById('grade-filter').value : '';
 
     document.querySelectorAll('button').forEach(btn => {
         btn.classList.remove('bg-blue-600', 'text-white');
@@ -174,9 +183,16 @@ function filterClasses(type) {
     const filteredClasses = classes.filter(cls => {
         const matchesSearch = cls.name.toLowerCase().includes(search);
         const matchesType = !typeFilter || cls.type === typeFilter;
-        const matchesDay = !dayFilter || cls.day === dayFilter;
-        const matchesPeriod = !periodFilter || cls.period === periodFilter;
-        return matchesSearch && matchesType && matchesDay && matchesPeriod;
+        const matchesDay = dayFilter === 'todos' || !dayFilter || cls.day === dayFilter;
+        const matchesPeriod = periodFilter === 'todos' || !periodFilter || cls.period === periodFilter;
+        const matchesPolo = poloFilter === 'todos' || !poloFilter || (cls.polo_name && cls.polo_name === poloFilter);
+        let matchesGrade = true;
+        if (gradeFilter && gradeFilter !== 'todos') {
+            const selectedGrades = JSON.parse(gradeFilter).map(Number);
+            const classGrades = extractAcceptedGrades(cls.grades);
+            matchesGrade = arraysEqual(selectedGrades, classGrades);
+        }
+        return matchesSearch && matchesType && matchesDay && matchesPeriod && matchesPolo && matchesGrade;
     });
 
     const div = document.getElementById('class-list');
@@ -210,6 +226,7 @@ function selectClass(classId) {
     selectedClass = classes.find(cls => cls.id === classId);
     document.getElementById('close-selected-class').classList.remove('hidden');
     document.getElementById('student-search-available').disabled = false;
+    document.getElementById('student-unit-filter').disabled = false;
     document.getElementById('enrolled-students-wrapper').classList.remove('hidden');
 
     const classType = selectedClass.type === 'cognitiva' ? 'Cognitiva' : 'Motora';
@@ -229,6 +246,7 @@ function deselectClass() {
     selectedClass = null;
     document.getElementById('close-selected-class').classList.add('hidden');
     document.getElementById('student-search-available').disabled = true;
+    document.getElementById('student-unit-filter').disabled = true;
     document.getElementById('enrolled-students-wrapper').classList.add('hidden');
     document.getElementById('selected-class-title').textContent = 'Nenhuma turma selecionada';
     document.getElementById('selected-class-details').innerHTML = `
@@ -248,14 +266,21 @@ function filterAvailableStudents() {
         return;
     }
     const search = document.getElementById('student-search-available').value.toLowerCase();
+    const unitFilter = document.getElementById('student-unit-filter').value.toLowerCase();
     let acceptedGrades = extractAcceptedGrades(selectedClass.grades);
 
     // Extrair o nome base da turma selecionada (ex.: "Robótica")
     const selectedClassName = extractClassName(selectedClass.name).toLowerCase();
 
     const availableStudents = students.filter(student => {
-        // Filtro de busca
+        // Filtro de busca por nome ou ID
         if (!(student.name.toLowerCase().includes(search) || student.id.includes(search))) {
+            return false;
+        }
+
+        // Filtro por unidade
+        const studentUnit = student.unidade ? student.unidade.toLowerCase() : '';
+        if (unitFilter && !studentUnit.includes(unitFilter)) {
             return false;
         }
 
@@ -527,10 +552,15 @@ document.addEventListener('DOMContentLoaded', () => {
     document.getElementById('class-search').addEventListener('input', () => filterClasses());
     document.getElementById('day-filter').addEventListener('change', () => filterClasses());
     document.getElementById('period-filter').addEventListener('change', () => filterClasses());
+    const poloFilter = document.getElementById('polo-filter');
+    const gradeFilter = document.getElementById('grade-filter');
+    if (poloFilter) poloFilter.addEventListener('change', () => filterClasses());
+    if (gradeFilter) gradeFilter.addEventListener('change', () => filterClasses());
 
     // Adicionar event listener para o botão de fechar
     document.getElementById('close-selected-class').addEventListener('click', deselectClass);
 
-    // Adicionar event listener para o input de busca de alunos disponíveis
+    // Adicionar event listeners para os inputs de busca e filtro por unidade de alunos disponíveis
     document.getElementById('student-search-available').addEventListener('input', filterAvailableStudents);
+    document.getElementById('student-unit-filter').addEventListener('input', filterAvailableStudents);
 });
