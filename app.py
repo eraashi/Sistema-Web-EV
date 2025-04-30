@@ -3,6 +3,8 @@ from supabase import create_client
 from dotenv import load_dotenv
 import os
 from retrying import retry
+from datetime import datetime
+import pytz
 
 app = Flask(__name__)
 load_dotenv()
@@ -823,6 +825,90 @@ def unenroll_turma(id):
         print(f"Erro em unenroll_turma: {str(e)}")
         return jsonify({'error': str(e)}), 500
 
+@app.route('/api/turmas_ativas', methods=['GET'])
+def get_turmas_ativas():
+    user = get_current_user()
+    if not user:
+        print("Erro: Usuário não autenticado em /api/turmas_ativas")
+        return jsonify({'error': 'Unauthorized'}), 401
+    try:
+        # Determinar o turno e dia da semana atuais com base no horário
+        sao_paulo_tz = pytz.timezone('America/Sao_Paulo')
+        current_time = datetime.now(sao_paulo_tz)
+        current_hour = current_time.hour
+        current_period = 'manha' if 6 <= current_hour <= 12 else 'tarde'
+
+        # Mapear o dia da semana atual para o formato do banco (seg, ter, qua, qui, sex)
+        weekday_map = {
+            0: 'seg',  # Segunda
+            1: 'ter',  # Terça
+            2: 'qua',  # Quarta
+            3: 'qui',  # Quinta
+            4: 'sex',  # Sexta
+        }
+        current_weekday = weekday_map.get(current_time.weekday())
+        if not current_weekday:
+            print("Hoje não é um dia letivo (sábado ou domingo)")
+            return jsonify({
+                'current_period': current_period,
+                'current_day': None,
+                'turmas': []
+            })
+
+        print(f"Buscando turmas ativas para o turno: {current_period}, dia: {current_weekday}")
+
+        # Consulta para turmas ativas no turno e dia atuais
+        query = supabase.table('turmas').select(
+            'id, nome, disciplinas(tipo), faixa_etaria, dia_semana, periodo, capacidade, matriculas(id, aluno_id, alunos(nome, unidade)), polo_id, polos!turmas_polo_id_fkey(nome)'
+        ).eq('periodo', current_period).eq('dia_semana', current_weekday)
+
+        # Filtrar com base no cargo do usuário
+        if user['cargo'] in ['admin', 'secretaria']:
+            turmas = execute_supabase_query(query)
+        elif user['cargo'] in ['monitor', 'diretor', 'coordenador']:
+            turmas = execute_supabase_query(query.eq('polo_id', user['polo_id']))
+        else:
+            turmas = []
+
+        print(f"Turmas encontradas: {len(turmas)}")
+
+        # Filtrar turmas com alunos matriculados (enrollmentCount > 0)
+        result = []
+        for turma in turmas:
+            matriculas = turma.get('matriculas', [])
+            enrollment_count = len(matriculas)
+            if enrollment_count == 0:
+                continue  # Ignora turmas sem alunos matriculados
+            polo_name = turma['polos']['nome'] if turma.get('polos') else 'Não especificado'
+            alunos = [
+                {'id': m['aluno_id'], 'name': m['alunos']['nome'], 'unidade': m['alunos'].get('unidade', 'Não especificado')}
+                for m in matriculas if m.get('alunos') and m['alunos'].get('nome')
+            ]
+            result.append({
+                'id': turma['id'],
+                'name': turma['nome'],
+                'subject': 'Cognitiva' if turma['disciplinas']['tipo'] == 'cognitiva' else 'Motora',
+                'type': turma['disciplinas']['tipo'],
+                'grades': turma['faixa_etaria'],
+                'day': turma['dia_semana'],
+                'period': turma['periodo'],
+                'capacity': turma['capacidade'],
+                'enrollmentCount': enrollment_count,
+                'polo_name': polo_name,
+                'students': alunos
+            })
+
+        print(f"Turmas ativas com alunos matriculados: {len(result)}")
+
+        return jsonify({
+            'current_period': current_period,
+            'current_day': current_weekday,
+            'turmas': result
+        })
+    except Exception as e:
+        print(f"Erro em get_turmas_ativas: {str(e)}")
+        return jsonify({'error': str(e)}), 500
+    
 @app.route('/api/matriculas', methods=['GET', 'POST'])
 def manage_matriculas():
     user = get_current_user()

@@ -1,16 +1,17 @@
 {% extends 'base.html' %}
 
-{% block title %}Relatórios{% endblock %}
+{% block title %}Estatísticas{% endblock %}
 
-{% block header %}Relatórios{% endblock %}
+{% block header %}Estatísticas{% endblock %}
 
 {% block content %}
 <div class="mb-6">
     <h2 class="text-lg font-semibold mb-4">Análises e Estatísticas do Programa Escola Viva</h2>
-    <div class="flex space-x-2">
+    <div class="flex space-x-2 flex-wrap">
         <button onclick="showTab('disciplinas')" class="bg-blue-600 text-white px-4 py-2 rounded-md hover:bg-blue-700">Distribuição por Disciplina</button>
         <button onclick="showTab('dias')" class="bg-gray-200 text-gray-700 px-4 py-2 rounded-md hover:bg-gray-300">Distribuição por Dias da Semana</button>
         <button onclick="showTab('taxa')" class="bg-gray-200 text-gray-700 px-4 py-2 rounded-md hover:bg-gray-300">Taxa de Ocupação Geral</button>
+        <button onclick="showTab('ativas')" class="bg-gray-200 text-gray-700 px-4 py-2 rounded-md hover:bg-gray-300">Turmas Ativas</button>
     </div>
 </div>
 <div id="disciplinas-tab" class="bg-white p-4 rounded-lg shadow-md">
@@ -26,6 +27,11 @@
     <p id="occupancy-rate" class="text-3xl font-bold mb-4">0%</p>
     <p class="text-gray-500">de ocupação das turmas</p>
     <p id="occupancy-details" class="text-gray-500">0 alunos matriculados de 0 vagas totais</p>
+</div>
+<div id="ativas-tab" class="bg-white p-4 rounded-lg shadow-md hidden">
+    <h3 class="text-lg font-semibold mb-4">Turmas Ativas com Alunos Matriculados (<span id="current-period"></span>, <span id="current-day"></span>)</h3>
+    <p id="active-classes-count" class="text-gray-500 mb-4">0 turmas ativas</p>
+    <div id="active-classes" class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-x-4 gap-y-1"></div>
 </div>
 <div class="grid grid-cols-1 md:grid-cols-2 gap-6 mt-6">
     <div class="bg-white p-4 rounded-lg shadow-md">
@@ -49,15 +55,32 @@
         <div id="available-students" class="space-y-4"></div>
     </div>
 </div>
+
+<!-- Modal para exibir alunos matriculados -->
+<div id="students-modal" class="fixed inset-0 bg-gray-600 bg-opacity-50 flex items-center justify-center hidden z-50">
+    <div class="bg-white rounded-lg shadow-xl w-full max-w-md p-6 max-h-[80vh] flex flex-col">
+        <div class="flex justify-between items-center mb-4">
+            <h3 id="modal-title" class="text-lg font-semibold text-gray-900">Alunos Matriculados</h3>
+            <button onclick="closeModal()" class="text-gray-500 hover:text-gray-700">
+                <svg class="h-6 w-6" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12"/>
+                </svg>
+            </button>
+        </div>
+        <div id="modal-students" class="space-y-4 overflow-y-auto flex-1"></div>
+    </div>
+</div>
 {% endblock %}
 
 {% block scripts %}
+<script src="https://unpkg.com/lucide@latest"></script>
 <script src="/static/js/reports.js"></script>
 <script>
     function showTab(tabId) {
         document.getElementById('disciplinas-tab').classList.add('hidden');
         document.getElementById('dias-tab').classList.add('hidden');
         document.getElementById('taxa-tab').classList.add('hidden');
+        document.getElementById('ativas-tab').classList.add('hidden');
         document.getElementById(tabId + '-tab').classList.remove('hidden');
 
         document.querySelectorAll('button').forEach(btn => {
@@ -86,7 +109,7 @@
                         </div>
                         <div>
                             <p class="font-medium">${student.name}</p>
-                            <p class="text-sm text-gray-500">ID: ${student.id} | ${student.grade}º Ano</p>
+                            <p class="text-sm text-gray-500">ID: ${student.id} | ${student.etapa}</p>
                         </div>
                     </div>
                     <button onclick="window.location.href='/enrollment?studentId=${student.id}'" class="bg-blue-600 text-white px-3 py-1 rounded-md hover:bg-blue-700">Matricular</button>

@@ -3,6 +3,42 @@ let classes = [];
 let enrollments = [];
 let selectedClass = null;
 
+// Lista de unidades permitidas (fornecida pelo usuário)
+const allowedUnits = [
+    "C.M.E. JURANDIR DA SILVA MELO",
+    "C.M.E. MENALDO CARLOS DE MAGALHÃES",
+    "C.M. GUSTAVO CAMPOS DA SILVEIRA",
+    "E.M. ANÍZIA ROSA DE OLIVEIRA COUTINHOGUSTAVO CAMPOS DA SILVEIRA",
+    "E.M. BELINO CATHARINO DE SOUZA",
+    "E.M. EDILÊNIO SILVA DE SOUZA",
+    "E.M. EDILSON VIGNOLI MARINS",
+    "E.M. ISMÊNIA DE BARROS BARROSO",
+    "E.M. JARDIM IPITANGAS",
+    "E.M. JOÃO LAUREANO DA SILVA",
+    "E.M. JOÃO MACHADO DA CUNHA",
+    "E.M. JOSÉ BANDEIRA",
+    "E.M. LUCIANA SANTANA COUTINHO",
+    "E.M. LÚCIO NUNES",
+    "E.M. MANOEL MUNIZ DA SILVA",
+    "E.M. MARGARIDA ROSA DE AMORIM",
+    "E.M. MARIA LUIZA DE AMORIM MENDONÇA",
+    "E.M. ORGÉ FERREIRA DOS SANTOS",
+    "E.M. PREFEITO WALQUIDES DE SOUZA LIMA",
+    "E.M. PROFESSOR FRANCISCO VIGNOLI",
+    "E.M. PROFESSORA OSÍRIS PALMIER DA VEIGA",
+    "E.M. RUBENS DE LIMA CAMPOS",
+    "E.M. SEBASTIÃO MANOEL DOS REIS",
+    "E.M. THEÓFILO D'ÁVILA",
+    "E.M. VALTEMIR JOSÉ DA COSTA",
+    "E.M. VILATUR",
+    "E.M. BEATRIZ AMARAL",
+    "E.M. ELCIRA DE OLIVEIRA COUTINHO",
+    "E.M. PAULO LUIZ BARROSO OLIVEIRA",
+    "E.M. PROFESSORA MARIA DE LOURDES MELO PAES BARRETO",
+    "E.M. VEREADOR IVAN DA SILVA MELO",
+    "C.M.E. PADRE MANUEL"
+];
+
 async function loadData() {
     try {
         const responses = await Promise.all([
@@ -133,7 +169,7 @@ function extractStudentGrade(studentEtapa) {
 }
 
 function extractAcceptedGrades(grades) {
-    if (!grades) { // Corrige o erro de sintaxe removendo "Woche"
+    if (!grades) {
         return [];
     }
 
@@ -258,6 +294,9 @@ function deselectClass() {
     document.getElementById('enrolled-students').innerHTML = `
         <div class="text-center py-4 text-gray-500">Nenhuma turma selecionada.</div>
     `;
+    // Limpar o select de unidades
+    const unitFilterSelect = document.getElementById('student-unit-filter');
+    unitFilterSelect.innerHTML = '<option value="">Filtrar por unidade</option>';
     lucide.createIcons();
 }
 
@@ -266,21 +305,16 @@ function filterAvailableStudents() {
         return;
     }
     const search = document.getElementById('student-search-available').value.toLowerCase();
-    const unitFilter = document.getElementById('student-unit-filter').value.toLowerCase();
+    const unitFilter = document.getElementById('student-unit-filter').value;
     let acceptedGrades = extractAcceptedGrades(selectedClass.grades);
 
     // Extrair o nome base da turma selecionada (ex.: "Robótica")
     const selectedClassName = extractClassName(selectedClass.name).toLowerCase();
 
-    const availableStudents = students.filter(student => {
+    // Passo 1: Filtrar os alunos disponíveis sem considerar o filtro de unidade
+    const potentialStudents = students.filter(student => {
         // Filtro de busca por nome ou ID
         if (!(student.name.toLowerCase().includes(search) || student.id.includes(search))) {
-            return false;
-        }
-
-        // Filtro por unidade
-        const studentUnit = student.unidade ? student.unidade.toLowerCase() : '';
-        if (unitFilter && !studentUnit.includes(unitFilter)) {
             return false;
         }
 
@@ -351,6 +385,25 @@ function filterAvailableStudents() {
         return true;
     });
 
+    // Passo 2: Extrair as unidades únicas dos alunos disponíveis e preencher o select
+    const unitFilterSelect = document.getElementById('student-unit-filter');
+    const currentSelectedUnit = unitFilterSelect.value; // Preserva a unidade selecionada
+    const units = [...new Set(potentialStudents.map(student => student.unidade).filter(unit => unit && allowedUnits.includes(unit)))];
+    units.sort(); // Ordena as unidades alfabeticamente
+    unitFilterSelect.innerHTML = '<option value="">Filtrar por unidade</option>' + 
+        units.map(unit => `<option value="${unit}">${unit}</option>`).join('');
+
+    // Restaura a unidade selecionada, se ainda estiver na lista
+    if (currentSelectedUnit && units.includes(currentSelectedUnit)) {
+        unitFilterSelect.value = currentSelectedUnit;
+    }
+
+    // Passo 3: Aplicar o filtro de unidade
+    const availableStudents = unitFilter ?
+        potentialStudents.filter(student => student.unidade === unitFilter) :
+        potentialStudents;
+
+    // Passo 4: Renderizar os alunos disponíveis
     const div = document.getElementById('available-students');
     div.innerHTML = availableStudents.length === 0 ?
         '<div class="text-center py-4 text-gray-500">Nenhum aluno disponível para esta turma.</div>' :
@@ -562,5 +615,5 @@ document.addEventListener('DOMContentLoaded', () => {
 
     // Adicionar event listeners para os inputs de busca e filtro por unidade de alunos disponíveis
     document.getElementById('student-search-available').addEventListener('input', filterAvailableStudents);
-    document.getElementById('student-unit-filter').addEventListener('input', filterAvailableStudents);
+    document.getElementById('student-unit-filter').addEventListener('change', filterAvailableStudents);
 });

@@ -1,17 +1,13 @@
-/* Importar Tailwind CSS */
-@import 'tailwindcss/base';
-@import 'tailwindcss/components';
-@import 'tailwindcss/utilities';
-
 /* Definir fonte padrão */
 body {
     font-family: 'Inter', sans-serif;
+    margin: 0;
 }
 
 /* Estilizar a Sidebar */
 .sidebar {
-    width: 16rem; /* 256px, equivalente ao w-64 do Tailwind */
-    background-color: #1E3A8A; /* Azul escuro da sidebar nas imagens */
+    width: 16rem;
+    background-color: #1E3A8A;
     color: white;
     display: flex;
     flex-direction: column;
@@ -23,7 +19,7 @@ body {
 
 /* Estilizar o contêiner principal para colar ao sidebar */
 .container {
-    margin-left: 16rem; /* Espaço para a sidebar */
+    margin-left: 16rem;
 }
 
 /* Estilizar o Header */
@@ -38,7 +34,6 @@ header {
 
 /* Estilizar o Conteúdo Principal */
 main {
-    padding: 1.5rem;
     flex: 1;
 }
 
@@ -48,12 +43,6 @@ main {
     padding: 1rem;
     border-radius: 0.5rem;
     box-shadow: 0 1px 3px rgba(0, 0, 0, 0.1);
-}
-
-.card h3 {
-    font-size: 0.875rem;
-    font-weight: 500;
-    color: #6B7280; /* Cinza para títulos */
 }
 
 .card p {
@@ -68,8 +57,8 @@ main {
 
 /* Estilizar Ícones nos Cards */
 .card [data-lucide] {
-    height: 1.5rem; /* 24px, equivalente a h-6 */
-    width: 1.5rem; /* 24px, equivalente a w-6 */
+    height: 1.5rem;
+    width: 1.5rem;
 }
 
 /* Estilizar Seção de Ocupação das Turmas */
@@ -98,7 +87,7 @@ table {
 }
 
 thead {
-    background-color: #F9FAFB; /* Cinza claro para cabeçalho */
+    background-color: #F9FAFB;
 }
 
 th, td {
@@ -136,14 +125,6 @@ button {
     transition: background-color 0.2s;
 }
 
-button.bg-blue-600:hover {
-    background-color: #1E40AF;
-}
-
-button.bg-gray-200:hover {
-    background-color: #D1D5DB;
-}
-
 /* Estilizar Etapas (Steps) */
 .step {
     display: flex;
@@ -164,14 +145,6 @@ button.bg-gray-200:hover {
     flex: 1;
     height: 0.25rem;
     margin: 0 0.5rem;
-}
-
-.step-line.bg-gray-300 {
-    background-color: #D1D5DB;
-}
-
-.step-line.bg-green-500 {
-    background-color: #10B981;
 }
 
 /* Estilizar Badges */
@@ -212,6 +185,359 @@ button.bg-gray-200:hover {
     border-radius: 9999px;
 }
 
+/* Estilização para a página de estatísticas (reports.html) */
+
+/* Estilizar a seção de Turmas Ativas */
+#ativas-tab {
+    max-height: 600px;
+    overflow-y: auto;
+}
+
+#active-classes {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, 280px);
+    gap: 4px 16px; /* gap-y-1 (4px) e gap-x-4 (16px) */
+    scrollbar-width: thin;
+    scrollbar-color: #93c5fd #e5e7eb;
+}
+
+#active-classes::-webkit-scrollbar {
+    width: 8px;
+}
+
+#active-classes::-webkit-scrollbar-track {
+    background: #e5e7eb;
+    border-radius: 4px;
+}
+
+#active-classes::-webkit-scrollbar-thumb {
+    background: #93c5fd;
+    border-radius: 4px;
+}
+
+#active-classes::-webkit-scrollbar-thumb:hover {
+    background: #2563eb;
+}
+
+/* Estilizar os cards como cartas compactas */
+#active-classes .card {
+    width: 280px;
+    min-height: 260px;
+    padding: 1.25rem; /* Ajustado via reports.js para p-5 */
+    border: 1px solid #93c5fd;
+    display: flex;
+    flex-direction: column;
+    justify-content: space-between;
+    box-sizing: border-box;
+    background-color: #f9fafb; /* Fundo ajustado via reports.js para bg-gray-50 */
+    transition: background-color 0.3s ease, box-shadow 0.3s ease;
+}
+
+#active-classes .card:hover {
+    background-color: #e0f2fe; /* Ajustado via reports.js para hover:bg-blue-50 */
+    box-shadow: 0 4px 12px rgba(0, 0, 0, 0.15); /* Ajustado via reports.js para hover:shadow-xl */
+}
+
+#active-classes .card .text-gray-600 {
+    color: #1f2937; /* Ajustado via reports.js para text-gray-700 */
+}
+
+#active-classes .card .text-gray-500 {
+    color: #374151; /* Ajustado via reports.js para text-gray-700 */
+}
+
+/* Estilizar o modal */
+#students-modal {
+    z-index: 50;
+}
+
+#students-modal .flex-1 {
+    scrollbar-width: thin;
+    scrollbar-color: #93c5fd #e5e7eb;
+}
+
+#students-modal .flex-1::-webkit-scrollbar {
+    width: 8px;
+}
+
+#students-modal .flex-1::-webkit-scrollbar-track {
+    background: #e5e7eb;
+    border-radius: 4px;
+}
+
+#students-modal .flex-1::-webkit-scrollbar-thumb {
+    background: #93c5fd;
+    border-radius: 4px;
+}
+
+#students-modal .flex-1::-webkit-scrollbar-thumb:hover {
+    background: #2563eb;
+}
+
+/* Estilização para a página de matrículas (enrollment.html) */
+
+/* Estilo para o contêiner de filtros */
+.filter-grid {
+    display: grid !important;
+    grid-template-columns: repeat(2, minmax(0, 1fr)) !important;
+    gap: 16px 8px !important; /* Espaço vertical: 16px, horizontal: 8px */
+    width: 100% !important;
+    min-width: 0 !important;
+}
+
+/* Estilo específico para os selects dentro da grade de filtros */
+.filter-select {
+    width: 100% !important;
+    min-width: 0 !important;
+    box-sizing: border-box !important;
+}
+
+/* Ajusta o espaço horizontal entre os selects */
+.filter-grid .filter-select:nth-child(odd) {
+    margin-right: 4px !important;
+}
+
+.filter-grid .filter-select:nth-child(even) {
+    margin-left: 4px !important;
+}
+
+/* Toast Animation */
+@keyframes fadeInOut {
+    0% { opacity: 0; transform: translateY(10px); }
+    10% { opacity: 1; transform: translateY(0); }
+    90% { opacity: 1; transform: translateY(0); }
+    100% { opacity: 0; transform: translateY(10px); }
+}
+
+/* Toast Container */
+#custom-toast-container {
+    position: fixed !important;
+    bottom: 16px !important;
+    right: 16px !important;
+    z-index: 10000 !important;
+    display: flex !important;
+    flex-direction: column !important;
+    gap: 8px !important;
+}
+
+/* Toast Styles */
+#custom-toast-container .custom-toast {
+    display: flex !important;
+    align-items: center !important;
+    justify-content: space-between !important;
+    min-width: 200px !important;
+    padding: 6px 10px !important;
+    border-radius: 6px !important;
+    box-shadow: 0 2px 4px rgba(0, 0, 0, 0.1) !important;
+    color: white !important;
+    font-size: 13px !important;
+    animation: fadeInOut 3s ease-in-out forwards !important;
+    line-height: 1.2 !important;
+}
+
+#custom-toast-container .custom-toast-success {
+    background-color: #22c55e !important;
+}
+
+#custom-toast-container .custom-toast-error {
+    background-color: #ef4444 !important;
+}
+
+#custom-toast-container .custom-toast-icon {
+    margin-right: 6px !important;
+    flex-shrink: 0 !important;
+}
+
+#custom-toast-container .custom-toast-message {
+    flex: 1 !important;
+    overflow: hidden !important;
+    text-overflow: ellipsis !important;
+    white-space: nowrap !important;
+}
+
+#custom-toast-container .custom-toast-close {
+    background: none !important;
+    border: none !important;
+    color: white !important;
+    font-size: 16px !important;
+    cursor: pointer !important;
+    padding: 0 6px !important;
+    flex-shrink: 0 !important;
+}
+
+/* Reset para evitar estilos indesejados do Tailwind nos botões Matricular */
+#available-students button {
+    all: unset;
+    display: inline-flex !important;
+    align-items: center !important;
+    justify-content: center !important;
+    padding: 0.25rem 0.75rem !important;
+    border-radius: 0.375rem !important;
+    cursor: pointer !important;
+    background-color: #2563eb !important;
+    color: #ffffff !important;
+    transition: background-color 0.2s ease-in-out !important;
+}
+
+#available-students button.bg-blue-600 {
+    background-color: #2563eb !important;
+    color: #ffffff !important;
+}
+
+#available-students button.bg-blue-600:hover {
+    background-color: #1d4ed8 !important;
+}
+
+#available-students button.bg-blue-600:disabled,
+#available-students button.bg-blue-600[disabled] {
+    background-color: #2563eb !important;
+    color: #ffffff !important;
+    opacity: 1 !important;
+    cursor: pointer !important;
+}
+
+#enrolled-students .bg-red-600 {
+    background-color: #dc2626 !important;
+    color: #ffffff !important;
+}
+
+#enrolled-students .bg-red-600:hover {
+    background-color: #b91c1c !important;
+}
+
+#enrolled-students .bg-red-600 i {
+    color: #ffffff !important;
+}
+
+/* Estilização da div do meio (Turma Selecionada) */
+#selected-class-title {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    font-size: 18px;
+    font-weight: 600;
+    color: #1f2937;
+}
+
+#selected-class-title .class-type-tag {
+    display: inline-block;
+    padding: 1px 6px;
+    border-radius: 9999px;
+    font-size: 12px;
+    font-weight: 500;
+    color: #ffffff;
+    transition: opacity 0.2s ease-in-out;
+}
+
+#selected-class-title .class-type-tag:hover {
+    opacity: 0.8;
+}
+
+#selected-class-title .class-type-tag.cognitiva {
+    background-color: #86efac;
+}
+
+#selected-class-title .class-type-tag.motora {
+    background-color: #d8b4fe;
+}
+
+#selected-class-details {
+    display: flex;
+    flex-direction: column;
+    gap: 12px;
+    color: #4b5563;
+    flex-shrink: 0;
+}
+
+#selected-class-details .detail-item {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    width: 100%;
+}
+
+#selected-class-details .detail-item i {
+    width: 20px;
+    height: 20px;
+    color: #6b7280;
+    flex-shrink: 0;
+}
+
+#selected-class-details .detail-item span {
+    font-size: 14px;
+    flex: 1;
+}
+
+/* Separador entre dados da turma e alunos matriculados */
+hr.separator {
+    border: none;
+    border-top: 2px solid #93c5fd;
+    margin: 16px auto;
+    width: 100%;
+    max-width: 100%;
+}
+
+/* Garantir que o separador seja visível apenas quando #enrolled-students-wrapper não estiver escondido */
+#enrolled-students-wrapper.hidden + hr.separator {
+    display: none;
+}
+
+/* Estilização dos detalhes na lista de turmas (primeiro div) */
+#class-list .class-item-details {
+    display: flex;
+    flex-direction: column;
+    gap: 4px;
+    color: #6b7280;
+}
+
+#class-list .class-item-details p {
+    font-size: 14px;
+    margin: 0;
+}
+
+/* Estilização da tag de tipo na lista de turmas */
+#class-list .class-type-tag {
+    display: inline-block;
+    padding: 1px 6px;
+    border-radius: 9999px;
+    font-size: 12px;
+    font-weight: 500;
+    color: #ffffff;
+    margin-left: 8px;
+}
+
+#class-list .class-type-tag.cognitiva {
+    background-color: #86efac;
+}
+
+#class-list .class-type-tag.motora {
+    background-color: #d8b4fe;
+}
+
+/* Estilização para garantir consistência no scroll */
+#class-list, #enrolled-students, #available-students {
+    scrollbar-width: thin;
+    scrollbar-color: #93c5fd #e5e7eb;
+}
+
+#class-list::-webkit-scrollbar, #enrolled-students::-webkit-scrollbar, #available-students::-webkit-scrollbar {
+    width: 8px;
+}
+
+#class-list::-webkit-scrollbar-track, #enrolled-students::-webkit-scrollbar-track, #available-students::-webkit-scrollbar-track {
+    background: #e5e7eb;
+    border-radius: 4px;
+}
+
+#class-list::-webkit-scrollbar-thumb, #enrolled-students::-webkit-scrollbar-thumb, #available-students::-webkit-scrollbar-thumb {
+    background: #93c5fd;
+    border-radius: 4px;
+}
+
+#class-list::-webkit-scrollbar-thumb:hover, #enrolled-students::-webkit-scrollbar-thumb:hover, #available-students::-webkit-scrollbar-thumb:hover {
+    background: #2563eb;
+}
+
 /* Responsividade */
 @media (max-width: 768px) {
     .sidebar {
@@ -222,9 +548,16 @@ button.bg-gray-200:hover {
 
     .container {
         margin-left: 0;
+        width: 100%;
     }
 
-    .sidebar-nav a {
-        padding: 0.75rem;
+    header {
+        padding: 1rem;
+    }
+
+    #active-classes .card {
+        width: 100%;
+        max-width: 280px;
+        margin: 0 auto;
     }
 }
