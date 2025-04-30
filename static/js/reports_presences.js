@@ -26,6 +26,20 @@ async function fetchOccurrences() {
     }
 }
 
+async function fetchClasses() {
+    try {
+        const response = await fetch('/api/turmas', { credentials: 'include' });
+        if (!response.ok) {
+            const errorText = await response.text();
+            throw new Error(`Erro ao carregar turmas: ${errorText}`);
+        }
+        return await response.json();
+    } catch (error) {
+        console.error('Erro em fetchClasses:', error.message);
+        return [];
+    }
+}
+
 function groupPresencesByTurmaDayShift(presences) {
     const grouped = {};
 
@@ -35,7 +49,7 @@ function groupPresencesByTurmaDayShift(presences) {
             grouped[key] = {
                 turma_id: presence.turma_id,
                 turma_nome: presence.turma_nome,
-                faixa_etaria: presence.faixa_etaria,
+                etapas: new Set(), // Usar Set para evitar duplicatas
                 turno: presence.turno_escola_viva,
                 dia: presence.data_escaneamento,
                 hora: presence.hora_escaneamento,
@@ -43,7 +57,13 @@ function groupPresencesByTurmaDayShift(presences) {
                 alunos: []
             };
         }
+        grouped[key].etapas.add(presence.etapa); // Adicionar a etapa do aluno ao Set
         grouped[key].alunos.push(presence);
+    });
+
+    // Converter o Set de etapas para um array
+    Object.values(grouped).forEach(group => {
+        group.etapas = Array.from(group.etapas);
     });
 
     return Object.values(grouped);
@@ -78,24 +98,100 @@ function formatTurmaName(name) {
 }
 
 function formatDateToBrazilian(dateStr) {
+    if (!dateStr) return '';
     const [year, month, day] = dateStr.split('-');
     return `${day}/${month}/${year}`;
 }
 
-function renderPresences(presences) {
+function filterPresences(presences, classes) {
+    const dateFilter = document.getElementById('filter-date').value;
+    const timeFilter = document.getElementById('filter-time').value;
+    const shiftFilter = document.getElementById('filter-shift').value;
+    const disciplineFilter = document.getElementById('filter-discipline').value;
+    const gradesFilter = document.getElementById('filter-grades').value;
+
+    // Mapear presenças para incluir o tipo de disciplina
+    const presencesWithDiscipline = presences.map(presence => {
+        const turma = classes.find(cls => cls.id === presence.turma_id);
+        return {
+            ...presence,
+            discipline: turma ? turma.type : ''
+        };
+    });
+
+    return groupPresencesByTurmaDayShift(presencesWithDiscipline).filter(group => {
+        const formattedDate = group.dia; // Formato YYYY-MM-DD
+        const matchesDate = !dateFilter || formattedDate === dateFilter;
+
+        // Filtrar por hora (ex.: "08h" corresponde a 08:00:00 até 08:59:59)
+        let matchesTime = true;
+        if (timeFilter) {
+            const selectedHour = parseInt(timeFilter.replace('h', ''), 10); // Ex.: "08h" -> 8
+            if (group.hora) {
+                const hourMatch = group.hora.match(/^(\d{2}):(\d{2}):(\d{2})$/);
+                if (hourMatch) {
+                    const hour = parseInt(hourMatch[1], 10); // Ex.: "08:00:00" -> 8
+                    matchesTime = hour === selectedHour;
+                } else {
+                    matchesTime = false;
+                }
+            } else {
+                matchesTime = false;
+            }
+        }
+
+        // Filtrar por turno, ignorando capitalização
+        const matchesShift = !shiftFilter || group.turno.toLowerCase() === shiftFilter.toLowerCase();
+
+        // Filtrar por disciplina, ignorando capitalização
+        const matchesDiscipline = !disciplineFilter || group.alunos.some(aluno => {
+            const turma = classes.find(cls => cls.id === aluno.turma_id);
+            return turma && turma.type.toLowerCase() === disciplineFilter.toLowerCase();
+        });
+
+        // Filtrar por etapas (ex.: "4º Ano" deve corresponder a qualquer grupo que tenha "4º Ano" em group.etapas)
+        const matchesGrades = !gradesFilter || group.etapas.includes(gradesFilter);
+
+        return matchesDate && matchesTime && matchesShift && matchesDiscipline && matchesGrades;
+    });
+}
+
+// Estado global para paginação
+let currentPage = 1;
+const itemsPerPage = 20;
+
+function renderPresences(presences, classes) {
     const presencesSection = document.getElementById('presences-section');
+    const paginationSection = document.getElementById('pagination-section') || document.createElement('div');
+    paginationSection.id = 'pagination-section';
+    paginationSection.className = 'flex justify-center mt-6 space-x-2';
+
     presencesSection.innerHTML = '';
+    paginationSection.innerHTML = '';
 
-    const groupedPresences = groupPresencesByTurmaDayShift(presences);
+    const filteredPresences = filterPresences(presences, classes);
+    const totalItems = filteredPresences.length;
+    const totalPages = Math.ceil(totalItems / itemsPerPage);
 
-    groupedPresences.forEach(group => {
+    // Ajustar página atual se necessário
+    if (currentPage > totalPages) {
+        currentPage = totalPages || 1;
+    }
+
+    // Calcular índices para a página atual
+    const startIndex = (currentPage - 1) * itemsPerPage;
+    const endIndex = Math.min(startIndex + itemsPerPage, totalItems);
+    const currentPresences = filteredPresences.slice(startIndex, endIndex);
+
+    // Renderizar cards de presenças
+    currentPresences.forEach(group => {
         const formattedTurmaName = formatTurmaName(group.turma_nome);
         const card = document.createElement('div');
-        card.className = 'bg-white p-4 rounded-lg shadow-md border-2 border-blue-300';
+        card.className = 'bg-white p-4 rounded-lg shadow-md border-2 border-blue-300 transition-all duration-300 hover:bg-blue-50 hover:shadow-xl';
         card.innerHTML = `
             <div class="mb-2">
                 <h3 class="text-lg font-semibold">${formattedTurmaName}</h3>
-                <p class="text-sm text-gray-600">Etapas: ${group.faixa_etaria.join(' e ')}</p>
+                <p class="text-sm text-gray-600">Etapas: ${group.etapas.join(' e ')}</p>
                 <p class="text-sm text-gray-600">Turno: ${group.turno}</p>
                 <p class="text-sm text-gray-600">Polo: ${group.polo_nome}</p>
                 <p class="text-sm text-gray-600">Dia: ${group.dia}</p>
@@ -149,6 +245,100 @@ function renderPresences(presences) {
 
         presencesSection.appendChild(card);
     });
+
+    // Renderizar controles de paginação
+    if (totalItems > 0) {
+        // Botão "Anterior"
+        const prevButton = document.createElement('button');
+        prevButton.className = `px-4 py-2 rounded-md ${currentPage === 1 ? 'bg-gray-200 text-gray-500 cursor-not-allowed' : 'bg-blue-600 text-white hover:bg-blue-700'}`;
+        prevButton.textContent = 'Anterior';
+        prevButton.disabled = currentPage === 1;
+        prevButton.addEventListener('click', () => {
+            if (currentPage > 1) {
+                currentPage--;
+                renderPresences(presences, classes);
+            }
+        });
+
+        // Números das páginas
+        const pageNumbers = document.createElement('div');
+        pageNumbers.className = 'flex space-x-1';
+        const maxVisiblePages = 5;
+        let startPage = Math.max(1, currentPage - Math.floor(maxVisiblePages / 2));
+        let endPage = Math.min(totalPages, startPage + maxVisiblePages - 1);
+
+        if (endPage - startPage + 1 < maxVisiblePages) {
+            startPage = Math.max(1, endPage - maxVisiblePages + 1);
+        }
+
+        // Adicionar "..." antes, se necessário
+        if (startPage > 1) {
+            const firstPage = document.createElement('button');
+            firstPage.className = 'px-4 py-2 rounded-md bg-gray-200 text-gray-700 hover:bg-gray-300';
+            firstPage.textContent = '1';
+            firstPage.addEventListener('click', () => {
+                currentPage = 1;
+                renderPresences(presences, classes);
+            });
+            pageNumbers.appendChild(firstPage);
+
+            if (startPage > 2) {
+                const dots = document.createElement('span');
+                dots.className = 'px-4 py-2 text-gray-700';
+                dots.textContent = '...';
+                pageNumbers.appendChild(dots);
+            }
+        }
+
+        // Adicionar números das páginas
+        for (let i = startPage; i <= endPage; i++) {
+            const pageButton = document.createElement('button');
+            pageButton.className = `px-4 py-2 rounded-md ${i === currentPage ? 'bg-blue-600 text-white' : 'bg-gray-200 text-gray-700 hover:bg-gray-300'}`;
+            pageButton.textContent = i;
+            pageButton.addEventListener('click', () => {
+                currentPage = i;
+                renderPresences(presences, classes);
+            });
+            pageNumbers.appendChild(pageButton);
+        }
+
+        // Adicionar "..." depois, se necessário
+        if (endPage < totalPages) {
+            if (endPage < totalPages - 1) {
+                const dots = document.createElement('span');
+                dots.className = 'px-4 py-2 text-gray-700';
+                dots.textContent = '...';
+                pageNumbers.appendChild(dots);
+            }
+
+            const lastPage = document.createElement('button');
+            lastPage.className = 'px-4 py-2 rounded-md bg-gray-200 text-gray-700 hover:bg-gray-300';
+            lastPage.textContent = totalPages;
+            lastPage.addEventListener('click', () => {
+                currentPage = totalPages;
+                renderPresences(presences, classes);
+            });
+            pageNumbers.appendChild(lastPage);
+        }
+
+        // Botão "Próximo"
+        const nextButton = document.createElement('button');
+        nextButton.className = `px-4 py-2 rounded-md ${currentPage === totalPages ? 'bg-gray-200 text-gray-500 cursor-not-allowed' : 'bg-blue-600 text-white hover:bg-blue-700'}`;
+        nextButton.textContent = 'Próximo';
+        nextButton.disabled = currentPage === totalPages;
+        nextButton.addEventListener('click', () => {
+            if (currentPage < totalPages) {
+                currentPage++;
+                renderPresences(presences, classes);
+            }
+        });
+
+        // Adicionar botões ao DOM
+        paginationSection.appendChild(prevButton);
+        paginationSection.appendChild(pageNumbers);
+        paginationSection.appendChild(nextButton);
+        presencesSection.parentElement.appendChild(paginationSection);
+    }
 }
 
 function openViewStudentsModal(group) {
@@ -169,7 +359,7 @@ function openViewStudentsModal(group) {
     // Preencher o título da turma e os detalhes dentro da div details-box
     modalDetails.innerHTML = `
         <h3 class="text-lg font-semibold mb-2">${formattedTurmaName}</h3>
-        Etapas: ${group.faixa_etaria.join(' e ')} | 
+        Etapas: ${group.etapas.join(' e ')} | 
         Turno: ${group.turno} | 
         Polo: ${group.polo_nome} | 
         Dia: ${group.dia} | 
@@ -263,7 +453,7 @@ function generateExcel(group) {
     const data = [
         ["Presença do dia:", formattedDate],
         ["Turma:", formattedTurmaName],
-        ["Etapas:", group.faixa_etaria.join(' e '), "Turno:", group.turno, "Polo:", group.polo_nome, "Dia:", group.dia, "Hora:", group.hora],
+        ["Etapas:", group.etapas.join(' e '), "Turno:", group.turno, "Polo:", group.polo_nome, "Dia:", group.dia, "Hora:", group.hora],
         [], // Linha em branco
         ["Nome", "Unidade", "Presença"]
     ];
@@ -336,7 +526,7 @@ function generatePDF(group) {
     doc.setFontSize(14);
     doc.text(`Turma: ${formattedTurmaName}`, 14, 30);
     doc.setFontSize(12);
-    doc.text(`Etapas: ${group.faixa_etaria.join(' e ')} | Turno: ${group.turno} | Polo: ${group.polo_nome} | Dia: ${group.dia} | Hora: ${group.hora}`, 14, 40);
+    doc.text(`Etapas: ${group.etapas.join(' e ')} | Turno: ${group.turno} | Polo: ${group.polo_nome} | Dia: ${group.dia} | Hora: ${group.hora}`, 14, 40);
 
     // Preparar os dados para a tabela de alunos
     const tableData = [];
@@ -445,8 +635,18 @@ function generatePDF(group) {
 
 document.addEventListener('DOMContentLoaded', async () => {
     const presences = await fetchPresences();
-    renderPresences(presences);
-
-    // Armazenar as ocorrências globalmente para uso posterior
+    const classes = await fetchClasses();
     window.occurrences = await fetchOccurrences();
+
+    // Renderizar presenças inicialmente
+    renderPresences(presences, classes);
+
+    // Adicionar eventos de mudança nos filtros
+    const filters = ['filter-date', 'filter-time', 'filter-shift', 'filter-discipline', 'filter-grades'];
+    filters.forEach(filterId => {
+        document.getElementById(filterId).addEventListener('change', () => {
+            currentPage = 1; // Resetar para a primeira página ao mudar os filtros
+            renderPresences(presences, classes);
+        });
+    });
 });

@@ -6,6 +6,66 @@
 
 {% block content %}
 <div class="space-y-8">
+    <!-- Seção de Filtros -->
+    <div>
+        <h2 class="text-lg font-semibold mb-4">Filtros de Presenças</h2>
+        <div class="border-2 border-blue-300 rounded-lg p-4 bg-white">
+            <div class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-5 gap-4 mb-6">
+                <div>
+                    <label for="filter-date" class="block text-sm font-medium text-gray-700 mb-1">Dia</label>
+                    <input type="date" id="filter-date" class="w-full p-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500">
+                </div>
+                <div>
+                    <label for="filter-time" class="block text-sm font-medium text-gray-700 mb-1">Hora</label>
+                    <select id="filter-time" class="w-full p-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500">
+                        <option value="">Todas</option>
+                        <option value="07h">07h</option>
+                        <option value="08h">08h</option>
+                        <option value="09h">09h</option>
+                        <option value="10h">10h</option>
+                        <option value="11h">11h</option>
+                        <option value="12h">12h</option>
+                        <option value="13h">13h</option>
+                        <option value="14h">14h</option>
+                        <option value="15h">15h</option>
+                        <option value="16h">16h</option>
+                        <option value="17h">17h</option>
+                        <option value="18h">18h</option>
+                        <option value="19h">19h</option>
+                    </select>
+                </div>
+                <div>
+                    <label for="filter-shift" class="block text-sm font-medium text-gray-700 mb-1">Turno</label>
+                    <select id="filter-shift" class="w-full p-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500">
+                        <option value="">Todos</option>
+                        <option value="manha">Manhã</option>
+                        <option value="tarde">Tarde</option>
+                    </select>
+                </div>
+                <div>
+                    <label for="filter-discipline" class="block text-sm font-medium text-gray-700 mb-1">Disciplina</label>
+                    <select id="filter-discipline" class="w-full p-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500">
+                        <option value="">Todas</option>
+                        <option value="cognitiva">Cognitiva</option>
+                        <option value="motora">Motora</option>
+                    </select>
+                </div>
+                <div>
+                    <label for="filter-grades" class="block text-sm font-medium text-gray-700 mb-1">Etapas</label>
+                    <select id="filter-grades" class="w-full p-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500">
+                        <option value="">Todas</option>
+                        <option value="4º Ano">4º Ano</option>
+                        <option value="5º Ano">5º Ano</option>
+                        <option value="6º Ano">6º Ano</option>
+                        <option value="7º Ano">7º Ano</option>
+                        <option value="8º Ano">8º Ano</option>
+                        <option value="9º Ano">9º Ano</option>
+                    </select>
+                </div>
+            </div>
+        </div>
+    </div>
+
     <!-- Seção de Presenças -->
     <div>
         <h2 class="text-lg font-semibold mb-4">Presenças</h2>

@@ -4,25 +4,84 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Login - Escola Viva</title>
-    <link href="/static/css/output.css" rel="stylesheet">
+    <script src="https://cdn.tailwindcss.com"></script>
+    <script src="https://unpkg.com/lucide@latest"></script>
+    <!-- Se você estiver usando um arquivo output.css gerado, descomente a linha abaixo e remova o CDN -->
+    <!-- <link href="/static/css/output.css" rel="stylesheet"> -->
 </head>
-<body class="bg-gray-100 flex items-center justify-center min-h-screen">
-    <div class="bg-white p-6 rounded-lg shadow-lg w-full max-w-md">
-        <h2 class="text-2xl font-bold mb-6 text-center">Sistema de Gestão - Escola Viva</h2>
-        <form id="login-form" class="space-y-4">
-            <div>
-                <label for="cpf" class="block text-sm font-medium text-gray-700">CPF</label>
-                <input type="text" id="cpf" name="cpf" class="mt-1 block w-full px-3 py-2 border border-gray-300 rounded-md shadow-sm focus:outline-none focus:ring-blue-500 focus:border-blue-500" required>
+<body class="bg-white min-h-screen flex flex-col">
+    <div class="flex-grow flex flex-col lg:flex-row items-center justify-center">
+        <!-- Seção de Texto à Esquerda -->
+        <div class="w-full lg:w-1/2 p-8 lg:pl-72 lg:p-8 flex flex-col items-start">
+            <!-- Logo -->
+            <div class="flex items-center mb-6">
+                <i data-lucide="school" class="h-8 w-8 text-blue-400 mr-2"></i>
+                <span class="text-2xl font-bold text-gray-900">Escola Viva</span>
             </div>
-            <div>
-                <label for="password" class="block text-sm font-medium text-gray-700">Senha</label>
-                <input type="password" id="password" name="password" class="mt-1 block w-full px-3 py-2 border border-gray-300 rounded-md shadow-sm focus:outline-none focus:ring-blue-500 focus:border-blue-500" required>
+
+            <!-- Saudação -->
+            <p class="text-xl text-gray-900">Olá,</p>
+            <h1 class="text-4xl font-bold text-gray-900 mt-1 mb-2">Que bom ter você de volta!</h1>
+
+            <!-- Instruções -->
+            <p class="text-base text-gray-600 mb-4">Preencha abaixo para acessar.</p>
+
+            <!-- Formulário de Login -->
+            <form id="login-form" class="w-full max-w-xs space-y-4">
+                <!-- Campo CPF -->
+                <div>
+                    <label for="cpf" class="block text-sm font-medium text-gray-700 mb-1">CPF</label>
+                    <div class="relative">
+                        <div class="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none">
+                            <svg class="h-5 w-5 text-gray-400" fill="none" stroke="currentColor" viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg">
+                                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M16 7a4 4 0 11-8 0 4 4 0 018 0zM12 14a7 7 0 00-7 7h14a7 7 0 00-7-7z"></path>
+                            </svg>
+                        </div>
+                        <input type="text" id="cpf" name="cpf" class="pl-10 block w-full px-3 py-2 border border-gray-300 rounded-md shadow-sm focus:outline-none focus:ring-blue-500 focus:border-blue-500" required placeholder="Digite seu CPF">
+                    </div>
+                </div>
+
+                <!-- Campo Senha -->
+                <div>
+                    <label for="password" class="block text-sm font-medium text-gray-700 mb-1">Senha</label>
+                    <div class="relative">
+                        <div class="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none">
+                            <svg class="h-5 w-5 text-gray-400" fill="none" stroke="currentColor" viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg">
+                                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 11c0-1.1.9-2 2-2s2 .9 2 2-2 4-2 4m-4-4c0-1.1-.9-2-2-2s-2 .9 2 2 2 4 2 4m4 4H8m4-8V4m0 16v-4"></path>
+                            </svg>
+                        </div>
+                        <input type="password" id="password" name="password" class="pl-10 block w-full px-3 py-2 border border-gray-300 rounded-md shadow-sm focus:outline-none focus:ring-blue-500 focus:border-blue-500" required placeholder="Digite sua senha">
+                    </div>
+                </div>
+
+                <!-- Botão Entrar -->
+                <div>
+                    <button type="submit" class="w-full bg-blue-600 text-white px-4 py-3 rounded-md hover:bg-blue-700 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:ring-opacity-50 transition-colors duration-200 text-lg font-semibold">Entrar</button>
+                </div>
+            </form>
+
+            <!-- Link "Esqueci minha senha" (Desabilitado) -->
+            <div class="mt-4">
+                <a href="#" class="text-sm text-gray-400 underline pointer-events-none cursor-not-allowed">Esqueci minha senha</a>
             </div>
-            <div>
-                <button type="submit" class="w-full bg-blue-600 text-white px-4 py-2 rounded-md hover:bg-blue-700 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:ring-opacity-50">Entrar</button>
-            </div>
-        </form>
+        </div>
+
+        <!-- Espaço Reservado para Imagem à Direita -->
+        <div class="w-full lg:w-1/2 h-64 lg:h-96 bg-gray-300">
+            <!-- Você pode adicionar a imagem aqui posteriormente -->
+        </div>
     </div>
+
+    <!-- Rodapé com Link de Ajuda (Desabilitado) -->
+    <div class="bg-blue-100 py-4 px-8 flex justify-center lg:justify-start">
+        <div class="flex items-center space-x-2">
+            <svg class="h-5 w-5 text-gray-400" fill="none" stroke="currentColor" viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg">
+                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M8.228 9c.549-1.165 2.03-2 3.772-2 2.21 0 4 1.343 4 3 0 1.4-1.278 2.575-3.006 2.907-.542.104-.994.54-.994 1.093m0 3h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z"></path>
+            </svg>
+            <a href="#" class="text-sm text-gray-400 pointer-events-none cursor-not-allowed">Está com dúvidas para fazer o login? Acesse Ajuda</a>
+        </div>
+    </div>
+
     <script>
         document.getElementById('login-form').addEventListener('submit', async (e) => {
             e.preventDefault();
@@ -50,6 +109,9 @@
                 alert('Erro: ' + error.message);
             }
         });
+
+        // Inicializar ícones Lucide
+        lucide.createIcons();
     </script>
 </body>
 </html>
