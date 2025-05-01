@@ -10,18 +10,18 @@
     <!-- <link href="/static/css/output.css" rel="stylesheet"> -->
 </head>
 <body class="bg-white min-h-screen flex flex-col">
-    <div class="flex-grow flex flex-col lg:flex-row items-center justify-center">
+    <!-- Contêiner Principal -->
+    <div class="flex flex-col lg:flex-row items-stretch h-[calc(100vh-60px)]">
         <!-- Seção de Texto à Esquerda -->
-        <div class="w-full lg:w-1/2 p-8 lg:pl-72 lg:p-8 flex flex-col items-start">
-            <!-- Logo -->
-            <div class="flex items-center mb-6">
-                <i data-lucide="school" class="h-8 w-8 text-blue-400 mr-2"></i>
-                <span class="text-2xl font-bold text-gray-900">Escola Viva</span>
+        <div class="w-full lg:w-1/2 p-8 lg:pl-72 lg:p-8 flex flex-col justify-center">
+            <!-- Espaço Reservado para Imagem (Logotipo) -->
+            <div class="w-80 h-40 mb-2">
+                <!-- Você pode adicionar sua imagem aqui, por exemplo: -->
+                <img src="/static/src/logo media.png" alt="Logotipo" class="w-full h-full object-contain">
             </div>
 
             <!-- Saudação -->
-            <p class="text-xl text-gray-900">Olá,</p>
-            <h1 class="text-4xl font-bold text-gray-900 mt-1 mb-2">Que bom ter você de volta!</h1>
+            <p class="text-4xl font-bold text-gray-900 mt-2 mb-2">Olá,</p>
 
             <!-- Instruções -->
             <p class="text-base text-gray-600 mb-4">Preencha abaixo para acessar.</p>
@@ -46,9 +46,7 @@
                     <label for="password" class="block text-sm font-medium text-gray-700 mb-1">Senha</label>
                     <div class="relative">
                         <div class="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none">
-                            <svg class="h-5 w-5 text-gray-400" fill="none" stroke="currentColor" viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg">
-                                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 11c0-1.1.9-2 2-2s2 .9 2 2-2 4-2 4m-4-4c0-1.1-.9-2-2-2s-2 .9 2 2 2 4 2 4m4 4H8m4-8V4m0 16v-4"></path>
-                            </svg>
+                            <i data-lucide="lock" class="h-5 w-5 text-gray-400"></i>
                         </div>
                         <input type="password" id="password" name="password" class="pl-10 block w-full px-3 py-2 border border-gray-300 rounded-md shadow-sm focus:outline-none focus:ring-blue-500 focus:border-blue-500" required placeholder="Digite sua senha">
                     </div>
@@ -66,14 +64,14 @@
             </div>
         </div>
 
-        <!-- Espaço Reservado para Imagem à Direita -->
-        <div class="w-full lg:w-1/2 h-64 lg:h-96 bg-gray-300">
-            <!-- Você pode adicionar a imagem aqui posteriormente -->
+        <!-- Imagem à Direita -->
+        <div class="w-full lg:w-1/2 h-[calc(50vh-60px)] lg:h-[calc(100vh-60px)] pr-0">
+            <img src="/static/src/escola viva login.png" alt="Imagem de Login" class="w-full h-full object-contain">
         </div>
     </div>
 
     <!-- Rodapé com Link de Ajuda (Desabilitado) -->
-    <div class="bg-blue-100 py-4 px-8 flex justify-center lg:justify-start">
+    <div class="bg-blue-100 py-4 px-8 flex justify-center lg:justify-start h-[60px]">
         <div class="flex items-center space-x-2">
             <svg class="h-5 w-5 text-gray-400" fill="none" stroke="currentColor" viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg">
                 <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M8.228 9c.549-1.165 2.03-2 3.772-2 2.21 0 4 1.343 4 3 0 1.4-1.278 2.575-3.006 2.907-.542.104-.994.54-.994 1.093m0 3h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z"></path>
