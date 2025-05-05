@@ -1,19 +1,21 @@
 let students = [];
 let classes = [];
 let enrollments = [];
+let activeClassesWithStudents = [];
 
 async function loadData() {
     try {
         const responses = await Promise.all([
             fetch('/api/alunos', { credentials: 'include' }),
             fetch('/api/turmas', { credentials: 'include' }),
-            fetch('/api/matriculas', { credentials: 'include' })
+            fetch('/api/matriculas', { credentials: 'include' }),
+            fetch('/api/turmas_ativas', { credentials: 'include' })
         ]);
 
         responses.forEach((response, index) => {
-            console.log(`Resposta da requisição ${['alunos', 'turmas', 'matriculas'][index]}: Status ${response.status}`);
+            console.log(`Resposta da requisição ${['alunos', 'turmas', 'matriculas', 'turmas_ativas'][index]}: Status ${response.status}`);
             if (!response.ok) {
-                console.log(`Erro na requisição ${['alunos', 'turmas', 'matriculas'][index]}: Status ${response.status}`);
+                console.log(`Erro na requisição ${['alunos', 'turmas', 'matriculas', 'turmas_ativas'][index]}: Status ${response.status}`);
             }
         });
 
@@ -23,11 +25,12 @@ async function loadData() {
             throw new Error(`Erro na requisição: ${failedResponse.url} retornou status ${failedResponse.status}. Detalhes: ${errorText}`);
         }
 
-        const [alunosData, classesData, enrollmentsData] = await Promise.all(responses.map(r => r.json()));
+        const [alunosData, classesData, enrollmentsData, turmasAtivasData] = await Promise.all(responses.map(r => r.json()));
 
         students = Array.isArray(alunosData.data) ? alunosData.data : [];
         classes = Array.isArray(classesData) ? classesData : [];
         enrollments = Array.isArray(enrollmentsData) ? enrollmentsData : [];
+        activeClassesWithStudents = turmasAtivasData.turmas || [];
 
         updateDashboard();
     } catch (error) {
@@ -54,7 +57,6 @@ async function fetchPoloStudentsCount() {
     }
 }
 
-// Função para determinar o turno atual no fuso horário de São Paulo
 function getCurrentPeriod() {
     const now = new Date();
     const saoPauloTime = new Date(now.toLocaleString('en-US', { timeZone: 'America/Sao_Paulo' }));
@@ -64,7 +66,6 @@ function getCurrentPeriod() {
     return period;
 }
 
-// Função para determinar o dia da semana atual no fuso horário de São Paulo
 function getCurrentDay() {
     const now = new Date();
     const saoPauloTime = new Date(now.toLocaleString('en-US', { timeZone: 'America/Sao_Paulo' }));
@@ -76,9 +77,47 @@ function getCurrentDay() {
         4: 'sex'  // Sexta
     };
     const dayIndex = saoPauloTime.getDay();
-    const day = weekdayMap[dayIndex - 1] || null; // Ajuste para considerar domingo (0) como não letivo
+    const day = weekdayMap[dayIndex - 1] || null;
     console.log(`Dia atual: ${day} (Dia da semana em São Paulo: ${dayIndex}, Data: ${saoPauloTime.toISOString()})`);
     return day;
+}
+
+// Função para criar e posicionar o popover
+function showPopover(event, cls, studentsList) {
+    // Remover qualquer popover existente
+    const existingPopover = document.querySelector('.custom-popover');
+    if (existingPopover) {
+        existingPopover.remove();
+    }
+
+    // Criar o popover
+    const popover = document.createElement('div');
+    popover.className = 'custom-popover fixed bg-white border border-gray-300 rounded-lg shadow-lg p-4 z-50 min-w-max';
+    const studentsHtml = studentsList.length > 0 
+        ? studentsList.map(student => `<p class="text-gray-600">${student.name} (${student.unidade || 'Sem unidade'})</p>`).join('')
+        : '<p class="text-gray-500">Nenhum aluno matriculado</p>';
+    popover.innerHTML = `
+        <h4 class="text-sm font-semibold text-gray-700 mb-2">${capitalizeFirstLetter(cls.name)}</h4>
+        ${studentsHtml}
+    `;
+
+    // Posicionar o popover com base nas coordenadas do mouse
+    const mouseX = event.clientX;
+    const mouseY = event.clientY;
+    popover.style.left = `${mouseX + 10}px`;
+    popover.style.top = `${mouseY + 10}px`;
+
+    // Adicionar o popover ao body
+    document.body.appendChild(popover);
+
+    // Ajustar a posição para evitar que o popover saia da tela
+    const rect = popover.getBoundingClientRect();
+    if (rect.right > window.innerWidth) {
+        popover.style.left = `${window.innerWidth - rect.width - 10}px`;
+    }
+    if (rect.bottom > window.innerHeight) {
+        popover.style.top = `${mouseY - rect.height - 10}px`;
+    }
 }
 
 async function updateDashboard() {
@@ -95,7 +134,7 @@ async function updateDashboard() {
     const currentPeriod = getCurrentPeriod();
     const currentDay = getCurrentDay();
     let activeClasses = [];
-    if (currentDay) { // Apenas filtrar se for um dia letivo
+    if (currentDay) {
         activeClasses = classes.filter(cls => 
             cls.period === currentPeriod && cls.day === currentDay && cls.enrollmentCount > 0
         );
@@ -128,15 +167,58 @@ async function updateDashboard() {
     const activeCognitiveClasses = activeClasses.filter(cls => cls.type === 'cognitiva');
     const activeMotorClasses = activeClasses.filter(cls => cls.type === 'motora');
 
-    // Atualizar a seção "Turmas Ativas no Polo" / "Turmas Ativas" com decoração e capitalização
-    const cognitiveOccupancy = activeCognitiveClasses.map(cls => 
-        `<span class="underline decoration-green-600">${capitalizeFirstLetter(cls.name)}: ${cls.enrollmentCount}/${cls.capacity}</span>`
-    ).join('<br>');
-    const motorOccupancy = activeMotorClasses.map(cls => 
-        `<span class="underline decoration-purple-600">${capitalizeFirstLetter(cls.name)}: ${cls.enrollmentCount}/${cls.capacity}</span>`
-    ).join('<br>');
+    // Criar HTML para turmas cognitivas com evento de hover e polo
+    const cognitiveOccupancy = activeCognitiveClasses.map((cls, index) => {
+        const turmaDetails = activeClassesWithStudents.find(turma => turma.id === cls.id);
+        const studentsList = turmaDetails && turmaDetails.students ? turmaDetails.students : [];
+        const poloName = turmaDetails && turmaDetails.polo_name ? turmaDetails.polo_name : 'Sem polo';
+        return `
+            <span id="cognitive-turma-${cls.id}" class="underline decoration-green-600 cursor-pointer">
+                ${capitalizeFirstLetter(cls.name)} (${poloName}): ${cls.enrollmentCount}/${cls.capacity}
+            </span>`;
+    }).join('<br>');
+
+    // Criar HTML para turmas motoras com evento de hover e polo
+    const motorOccupancy = activeMotorClasses.map((cls, index) => {
+        const turmaDetails = activeClassesWithStudents.find(turma => turma.id === cls.id);
+        const studentsList = turmaDetails && turmaDetails.students ? turmaDetails.students : [];
+        const poloName = turmaDetails && turmaDetails.polo_name ? turmaDetails.polo_name : 'Sem polo';
+        return `
+            <span id="motor-turma-${cls.id}" class="underline decoration-purple-600 cursor-pointer">
+                ${capitalizeFirstLetter(cls.name)} (${poloName}): ${cls.enrollmentCount}/${cls.capacity}
+            </span>`;
+    }).join('<br>');
+
     document.getElementById('cognitive-occupancy').innerHTML = cognitiveOccupancy || 'Nenhuma disciplina cognitiva ativa';
     document.getElementById('motor-occupancy').innerHTML = motorOccupancy || 'Nenhuma disciplina motora ativa';
+
+    // Adicionar eventos de hover para turmas cognitivas
+    activeCognitiveClasses.forEach(cls => {
+        const element = document.getElementById(`cognitive-turma-${cls.id}`);
+        if (element) {
+            const turmaDetails = activeClassesWithStudents.find(turma => turma.id === cls.id);
+            const studentsList = turmaDetails && turmaDetails.students ? turmaDetails.students : [];
+            element.addEventListener('mouseover', (event) => showPopover(event, cls, studentsList));
+            element.addEventListener('mouseout', () => {
+                const popover = document.querySelector('.custom-popover');
+                if (popover) popover.remove();
+            });
+        }
+    });
+
+    // Adicionar eventos de hover para turmas motoras
+    activeMotorClasses.forEach(cls => {
+        const element = document.getElementById(`motor-turma-${cls.id}`);
+        if (element) {
+            const turmaDetails = activeClassesWithStudents.find(turma => turma.id === cls.id);
+            const studentsList = turmaDetails && turmaDetails.students ? turmaDetails.students : [];
+            element.addEventListener('mouseover', (event) => showPopover(event, cls, studentsList));
+            element.addEventListener('mouseout', () => {
+                const popover = document.querySelector('.custom-popover');
+                if (popover) popover.remove();
+            });
+        }
+    });
 }
 
 async function refreshEnrollments() {
