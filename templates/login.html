@@ -52,6 +52,9 @@
                     </div>
                 </div>
 
+                <!-- Contêiner para Mensagem de Erro -->
+                <div id="error-message" class="space-y-4"></div>
+
                 <!-- Botão Entrar -->
                 <div>
                     <button type="submit" class="w-full bg-blue-600 text-white px-4 py-3 rounded-md hover:bg-blue-700 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:ring-opacity-50 transition-colors duration-200 text-lg font-semibold">Entrar</button>
@@ -86,6 +89,10 @@
             const cpf = document.getElementById('cpf').value;
             const password = document.getElementById('password').value;
 
+            // Limpar mensagens de erro anteriores
+            const errorContainer = document.getElementById('error-message');
+            errorContainer.innerHTML = '';
+
             try {
                 const response = await fetch('/login', {
                     method: 'POST',
@@ -100,11 +107,21 @@
                     window.location.href = data.redirect || '/dashboard';
                 } else {
                     console.log('Erro ao fazer login:', data.error || 'Erro desconhecido');
-                    alert(data.error || 'Erro ao fazer login');
+                    // Inserir a div de erro no contêiner
+                    const errorDiv = document.createElement('div');
+                    errorDiv.className = 'bg-red-100 border-l-4 border-red-500 text-red-700 p-4 rounded-lg';
+                    errorDiv.setAttribute('role', 'alert');
+                    errorDiv.innerHTML = '<p>Credenciais inválidas. Tente novamente.</p>';
+                    errorContainer.appendChild(errorDiv);
                 }
             } catch (error) {
                 console.log('Erro na requisição de login:', error.message);
-                alert('Erro: ' + error.message);
+                // Inserir a div de erro no contêiner
+                const errorDiv = document.createElement('div');
+                errorDiv.className = 'bg-red-100 border-l-4 border-red-500 text-red-700 p-4 rounded-lg';
+                errorDiv.setAttribute('role', 'alert');
+                errorDiv.innerHTML = '<p>Erro: ' + error.message + '</p>';
+                errorContainer.appendChild(errorDiv);
             }
         });
 
