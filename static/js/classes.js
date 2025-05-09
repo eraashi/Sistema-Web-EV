@@ -220,7 +220,7 @@
             console.error('Modal element not found');
             return;
         }
-        console.log('Fechando modal, alterando display para none');
+        console.log('Fechando modal de edição');
         modal.style.display = 'none';
     }
 
@@ -350,7 +350,7 @@
             { id: 'day', message: 'Por favor, selecione o dia da semana' },
             { id: 'period', message: 'Por favor, selecione o período' },
             { id: 'grades', message: 'Por favor, selecione o ano escolar' },
-            { id: 'polo_name', message: 'Por favor, selecione o polo' }, // Corrigido de 'polo-name' para 'polo_name'
+            { id: 'polo_name', message: 'Por favor, selecione o polo' },
             { id: 'capacity', message: 'Por favor, insira a capacidade da turma' }
         ];
 
@@ -365,18 +365,18 @@
 
         if (hasError) {
             console.log('Validação falhou: Campos obrigatórios não preenchidos');
-            return; // Impede o salvamento e mantém o modal aberto
+            return;
         }
 
         console.log('Validação bem-sucedida, prosseguindo com a criação da turma');
 
         // Parsear o valor de grades (que é uma string JSON) para um array
         try {
-            classData.grades = JSON.parse(classData.grades); // Ex.: ["4", "5"]
+            classData.grades = JSON.parse(classData.grades);
             console.log('Dados após parse do grades:', classData);
         } catch (error) {
             console.error('Erro ao parsear grades:', error);
-            showToast('Erro ao processar o ano escolar', 'error', 'alert-circle', 3000);
+            showTooltip('grades', 'Erro ao processar o ano escolar');
             return;
         }
 
@@ -447,6 +447,13 @@
             console.error('Elemento do modal (edit-class-modal) não encontrado no DOM');
         } else {
             console.log('Elemento do modal (edit-class-modal) encontrado no DOM');
+            // Adicionar evento para fechar o modal ao clicar fora
+            editModal.addEventListener('click', (event) => {
+                if (event.target === editModal) {
+                    console.log('Clique fora do modal de edição detectado');
+                    closeEditModal();
+                }
+            });
         }
 
         // Verificar se o elemento do modal de criação existe no DOM
@@ -455,6 +462,13 @@
             console.error('Elemento do modal (create-class-modal) não encontrado no DOM');
         } else {
             console.log('Elemento do modal (create-class-modal) encontrado no DOM');
+            // Adicionar evento para fechar o modal ao clicar fora
+            createModal.addEventListener('click', (event) => {
+                if (event.target === createModal) {
+                    console.log('Clique fora do modal de criação detectado');
+                    closeCreateModal();
+                }
+            });
         }
 
         // Verificar se o botão "Cancelar" do modal de edição existe no DOM e adicionar event listener

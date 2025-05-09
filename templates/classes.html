@@ -97,7 +97,7 @@
                 </div>
                 <div class="modal-field">
                     <label for="edit-capacity" class="modal-label">Capacidade</label>
-                    <input type="number" id="edit-capacity" name="capacity", class="modal-input" required>
+                    <input type="number" id="edit-capacity" name="capacity" class="modal-input" min="0" required>
                 </div>
             </div>
             <div class="modal-footer">
@@ -118,7 +118,7 @@
         <h2 class="modal-title">Criar Nova Turma</h2>
         <form id="create-class-form">
             <div class="modal-fields">
-                <div class="modal-field flex items-center mb-4">
+                <div class="modal-field-with-icon flex items-center mb-4">
                     <i data-lucide="book-type" class="h-5 w-5 mr-2 icon-align"></i>
                     <div class="field-container">
                         <label for="create-name" class="modal-label">Título</label>
@@ -126,7 +126,7 @@
                         <div class="tooltip" id="tooltip-name"></div>
                     </div>
                 </div>
-                <div class="modal-field flex items-center mb-4">
+                <div class="modal-field-with-icon flex items-center mb-4">
                     <i id="type-icon" data-lucide="brain" class="h-5 w-5 mr-2 icon-align"></i>
                     <div class="field-container">
                         <label for="create-type" class="modal-label">Tipo</label>
@@ -138,7 +138,7 @@
                         <div class="tooltip" id="tooltip-type"></div>
                     </div>
                 </div>
-                <div class="modal-field flex items-center mb-4">
+                <div class="modal-field-with-icon flex items-center mb-4">
                     <i data-lucide="calendar" class="h-5 w-5 mr-2 icon-align"></i>
                     <div class="field-container">
                         <label for="create-day" class="modal-label">Dia da Semana</label>
@@ -153,7 +153,7 @@
                         <div class="tooltip" id="tooltip-day"></div>
                     </div>
                 </div>
-                <div class="modal-field flex items-center mb-4">
+                <div class="modal-field-with-icon flex items-center mb-4">
                     <i data-lucide="clock" class="h-5 w-5 mr-2 icon-align"></i>
                     <div class="field-container">
                         <label for="create-period" class="modal-label">Período</label>
@@ -165,7 +165,7 @@
                         <div class="tooltip" id="tooltip-period"></div>
                     </div>
                 </div>
-                <div class="modal-field flex items-center mb-4">
+                <div class="modal-field-with-icon flex items-center mb-4">
                     <i data-lucide="graduation-cap" class="h-5 w-5 mr-2 icon-align"></i>
                     <div class="field-container">
                         <label for="create-grades" class="modal-label">Ano Escolar</label>
@@ -178,7 +178,7 @@
                         <div class="tooltip" id="tooltip-grades"></div>
                     </div>
                 </div>
-                <div class="modal-field flex items-center mb-4">
+                <div class="modal-field-with-icon flex items-center mb-4">
                     <i data-lucide="school" class="h-5 w-5 mr-2 icon-align"></i>
                     <div class="field-container">
                         <label for="create-polo-name" class="modal-label">Polo</label>
@@ -192,11 +192,11 @@
                         <div class="tooltip" id="tooltip-polo-name"></div>
                     </div>
                 </div>
-                <div class="modal-field flex items-center mb-4">
+                <div class="modal-field-with-icon flex items-center mb-4">
                     <i data-lucide="users" class="h-5 w-5 mr-2 icon-align"></i>
                     <div class="field-container">
                         <label for="create-capacity" class="modal-label">Capacidade</label>
-                        <input type="number" id="create-capacity" name="capacity" class="modal-input modal-input-narrow" placeholder="Digite um número..." required>
+                        <input type="number" id="create-capacity" name="capacity" class="modal-input modal-input-narrow" placeholder="Digite um número..." min="0" required>
                         <div class="tooltip" id="tooltip-capacity"></div>
                     </div>
                 </div>
@@ -245,7 +245,7 @@
 }
 
 .modal-content-narrow {
-    width: 420px; /* Ajustando a largura do modal para o limite dos inputs/selects */
+    width: 420px;
     max-width: 420px;
 }
 
@@ -264,14 +264,20 @@
 .modal-fields {
     display: flex;
     flex-direction: column;
-    gap: 8px; /* Espaço vertical reduzido */
+    gap: 8px;
 }
 
 .modal-field {
     display: flex;
+    flex-direction: column;
+    position: relative;
+}
+
+/* Estilo específico para campos com ícones ao lado no modal de criação */
+.modal-field-with-icon {
+    display: flex;
     flex-direction: row;
     align-items: center;
-    position: relative; /* Para posicionar o tooltip */
 }
 
 .field-container {
@@ -297,7 +303,7 @@
 }
 
 .modal-input-narrow {
-    width: 350px; /* Largura ajustada */
+    width: 350px;
 }
 
 .modal-input:focus {
@@ -307,7 +313,7 @@
 
 .icon-align {
     position: relative;
-    top: 8px; /* Alinhamento mantido */
+    top: 8px;
 }
 
 .modal-footer {
@@ -370,10 +376,9 @@
 .attention-box {
     margin-top: 20px;
     padding: 12px;
-    border: 2px solid #93c5fd; /* Contorno azul */
+    border: 2px solid #93c5fd;
     border-radius: 8px;
-    background-color: #f3f4f6; /* Cinza claro */
-    width: 376px; /* Ajustando para o limite interno do modal (420px - 40px padding - 4px borda) */
+    background-color: rgba(245, 158, 11, 0.1);
 }
 
 .attention-title {
@@ -387,16 +392,16 @@
     font-size: 0.875rem;
     color: #4b5563;
     line-height: 1.5;
-    white-space: normal; /* Permite que o texto quebre em várias linhas */
+    white-space: normal;
 }
 
 /* Estilo do Tooltip */
 .tooltip {
     position: absolute;
     top: 50%;
-    left: -10px; /* Posiciona o tooltip à esquerda do campo */
+    left: -10px;
     transform: translateY(-50%);
-    background-color: #ef4444; /* Vermelho para erro */
+    background-color: #ef4444;
     color: white;
     padding: 4px 8px;
     border-radius: 4px;
@@ -420,7 +425,7 @@
     position: fixed !important;
     bottom: 16px !important;
     right: 16px !important;
-    z-index: 10001 !important; /* z-index maior que o modal (1000) */
+    z-index: 10001 !important;
     display: flex !important;
     flex-direction: column !important;
     gap: 8px !important;
