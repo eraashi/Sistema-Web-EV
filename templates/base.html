@@ -18,9 +18,9 @@
     </script>
 </head>
 <body class="bg-gray-100 font-sans">
-    <div class="flex min-h-screen">
+    <div class="flex-container">
         <!-- Sidebar -->
-        <div class="w-64 bg-blue-800 text-white flex flex-col">
+        <div class="sidebar w-64 bg-blue-800 text-white flex flex-col">
             <div class="p-4 text-2xl font-bold">Escola Viva</div>
             <nav class="flex-1">
                 <a href="/dashboard" class="flex items-center p-4 hover:bg-blue-700 {% if request.path == '/dashboard' %}bg-blue-700{% endif %}">
@@ -67,7 +67,7 @@
             <div class="p-4 text-sm">Usuário: {{ user.nome if user else 'Admin' }}</div>
         </div>
         <!-- Main Content -->
-        <div class="flex-1 flex flex-col">
+        <div class="container flex-1 flex flex-col">
             <header class="bg-white shadow-sm p-4 flex justify-between items-center">
                 <h1 class="text-xl font-semibold">{% block header %}{% endblock %}</h1>
                 <div class="flex items-center space-x-2">
@@ -82,7 +82,7 @@
     </div>
     <!-- Custom Toast Container -->
     <div id="custom-toast-container" class="fixed bottom-4 right-4 z-[10000] flex flex-col space-y-2">
-        <!-- Toasts will be dynamically added aqui -->
+        <!-- Toasts will be dinamically added aqui -->
     </div>
 
     <style>

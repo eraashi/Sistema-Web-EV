@@ -5,10 +5,10 @@
 {% block header %}Dashboard{% endblock %}
 
 {% block content %}
-<div class="mb-6 px-6">
+<div class="mb-6 px-6 full-width-container">
     <h2 class="text-lg font-semibold mb-4">Visão Geral do Programa Escola Viva</h2>
 </div>
-<div class="grid grid-cols-1 md:grid-cols-4 gap-6 mb-6 px-6">
+<div class="grid grid-cols-1 md:grid-cols-4 gap-6 mb-6 px-6 full-width-container">
     <div class="bg-white border border-blue-400 rounded-lg shadow-md p-4 hover:scale-105 hover:shadow-lg transition-transform duration-200">
         <div class="flex items-center mb-2">
             <i data-lucide="users" class="h-6 w-6 text-blue-600 mr-2"></i>
@@ -44,7 +44,7 @@
         <p id="motor-classes" class="text-2xl font-bold">0</p>
     </div>
 </div>
-<div class="bg-white border border-blue-400 rounded-lg shadow-md p-4 px-6">
+<div class="bg-white border border-blue-400 rounded-lg shadow-md p-4 px-6 full-width-container">
     <h3 class="text-lg font-semibold mb-4">
         {% if user.cargo in ['admin', 'secretaria'] %}
             Turmas Ativas

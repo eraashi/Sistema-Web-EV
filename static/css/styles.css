@@ -2,6 +2,7 @@
 body {
     font-family: 'Inter', sans-serif;
     margin: 0;
+    background-color: #1E3A8A; /* Cor da sidebar para preencher o espaço à esquerda */
 }
 
 /* Estilizar a Sidebar */
@@ -12,14 +13,24 @@ body {
     display: flex;
     flex-direction: column;
     height: 100vh;
-    position: fixed;
+    position: fixed; /* Fixa a sidebar na viewport */
     top: 0;
     left: 0;
+    z-index: 1000; /* Garante que a sidebar fique acima de outros elementos */
 }
 
-/* Estilizar o contêiner principal para colar ao sidebar */
+/* Estilizar o contêiner pai (flex) */
+.flex-container {
+    display: flex;
+    min-height: 100vh;
+}
+
+/* Estilizar o contêiner principal */
 .container {
-    margin-left: 16rem;
+    flex: 1; /* Ocupa o espaço restante */
+    margin-left: 0; /* Remove o margin-left, pois a sidebar é fixa */
+    background-color: #f3f4f6; /* Cor bg-gray-100 do Tailwind */
+    box-sizing: border-box;
 }
 
 /* Estilizar o Header */
@@ -30,19 +41,51 @@ header {
     display: flex;
     justify-content: space-between;
     align-items: center;
+    width: calc(100vw - 16rem); /* Ocupa a largura da viewport menos a sidebar */
+    position: relative;
+    left: 0; /* Alinha com a borda esquerda do .container */
+    z-index: 999; /* Garante que o header fique abaixo da sidebar, mas acima do conteúdo */
+}
+
+/* Ajustar o título do header */
+header h1 {
+    margin-left: 0; /* Remove o deslocamento, para alinhar à esquerda do espaço disponível */
 }
 
 /* Estilizar o Conteúdo Principal */
 main {
     flex: 1;
+    width: calc(100vw - 16rem - 0.5rem); /* Compensa o padding-left adicional dos contêineres filhos */
+    padding: 1rem 0; /* Remove padding lateral, mantém padding vertical */
+    box-sizing: border-box;
+}
+
+/* Classe para contêineres que devem ocupar toda a largura disponível */
+.full-width-container {
+    width: 100%;
+    padding-left: 1.5rem; /* Restaura padding simétrico à esquerda (equivalente a px-6) */
+    padding-right: 1.5rem; /* Restaura padding simétrico à direita */
+    box-sizing: border-box;
+}
+
+/* Ajustar o grid para ocupar toda a largura disponível */
+.grid {
+    display: grid;
+    grid-template-columns: repeat(auto-fill, minmax(0, 1fr)); /* Distribui os cards igualmente */
+    gap: 1.5rem; /* Mantém o gap-6 (24px) */
+    width: 100%; /* Garante que o grid ocupe toda a largura disponível */
+    padding-left: 1.5rem; /* Restaura padding simétrico à esquerda */
+    padding-right: 1.5rem; /* Restaura padding simétrico à direita */
 }
 
 /* Estilizar Cards */
 .card {
     background-color: white;
-    padding: 1rem;
+    padding: 1rem 1.5rem; /* Mantém padding simétrico (equivalente a p-4 do Tailwind) */
     border-radius: 0.5rem;
     box-shadow: 0 1px 3px rgba(0, 0, 0, 0.1);
+    width: 100%; /* Garante que cada card ocupe o espaço disponível na coluna */
+    box-sizing: border-box;
 }
 
 .card p {
@@ -66,7 +109,9 @@ main {
     background-color: white;
     border-radius: 0.5rem;
     box-shadow: 0 1px 3px rgba(0, 0, 0, 0.1);
-    padding: 1rem;
+    padding: 1rem 1.5rem; /* Mantém padding simétrico */
+    width: 100%; /* Garante que a seção ocupe toda a largura disponível */
+    box-sizing: border-box;
 }
 
 .occupancy-section h3 {
@@ -91,7 +136,7 @@ thead {
 }
 
 th, td {
-    padding: 0.75rem 1.5rem;
+    padding: 0.75rem 1.5rem; /* Mantém padding simétrico (equivalente a px-6 do Tailwind) */
     text-align: left;
 }
 
@@ -106,11 +151,19 @@ tr {
     border-bottom: 1px solid #E5E7EB;
 }
 
+tr:nth-child(even) {
+    background-color: #f9fafb;
+}
+
+tr:nth-child(odd) {
+    background-color: white;
+}
+
 /* Estilizar Inputs e Botões */
 input, select {
     border: 1px solid #D1D5DB;
     border-radius: 0.375rem;
-    padding: 0.5rem 0.75rem;
+    padding: 0.5rem 0.75rem; /* Mantém padding simétrico */
     width: 100%;
     transition: border-color 0.2s;
 }
@@ -191,39 +244,26 @@ button {
 #ativas-tab {
     max-height: 600px;
     overflow-y: auto;
+    padding-left: 1.5rem;
+    padding-right: 1.5rem; /* Restaura padding simétrico */
 }
 
 #active-classes {
     display: grid;
-    grid-template-columns: repeat(auto-fit, 280px);
+    grid-template-columns: repeat(auto-fill, minmax(280px, 1fr)); /* Ajusta o grid para ocupar toda a largura */
     gap: 4px 16px; /* gap-y-1 (4px) e gap-x-4 (16px) */
     scrollbar-width: thin;
     scrollbar-color: #93c5fd #e5e7eb;
+    width: 100%; /* Garante que o grid ocupe toda a largura */
+    padding-left: 1.5rem;
+    padding-right: 1.5rem; /* Restaura padding simétrico */
 }
 
-#active-classes::-webkit-scrollbar {
-    width: 8px;
-}
-
-#active-classes::-webkit-scrollbar-track {
-    background: #e5e7eb;
-    border-radius: 4px;
-}
-
-#active-classes::-webkit-scrollbar-thumb {
-    background: #93c5fd;
-    border-radius: 4px;
-}
-
-#active-classes::-webkit-scrollbar-thumb:hover {
-    background: #2563eb;
-}
-
-/* Estilizar os cards como cartas compactas */
+/* Ajustar o padding interno dos cards para evitar que fiquem colados à borda esquerda */
 #active-classes .card {
-    width: 280px;
+    width: 100%; /* Garante que cada card ocupe o espaço disponível na coluna */
     min-height: 260px;
-    padding: 1.25rem; /* Ajustado via reports.js para p-5 */
+    padding: 1.25rem; /* Mantém o padding simétrico (equivalente a p-5 do Tailwind) */
     border: 1px solid #93c5fd;
     display: flex;
     flex-direction: column;
@@ -283,6 +323,8 @@ button {
     gap: 16px 8px !important; /* Espaço vertical: 16px, horizontal: 8px */
     width: 100% !important;
     min-width: 0 !important;
+    padding-left: 0 !important; /* Remove o padding-left extra para alinhar com o input */
+    padding-right: 0 !important; /* Remove o padding-right extra para alinhar com o input */
 }
 
 /* Estilo específico para os selects dentro da grade de filtros */
@@ -290,6 +332,9 @@ button {
     width: 100% !important;
     min-width: 0 !important;
     box-sizing: border-box !important;
+    padding-left: 0.75rem !important; /* Reduz o padding-left para remover o espaço extra */
+    padding-right: 0.75rem !important; /* Mantém o padding-right padrão */
+    text-indent: 0 !important; /* Remove qualquer text-indent padrão que possa estar afetando o texto */
 }
 
 /* Ajusta o espaço horizontal entre os selects */
@@ -538,26 +583,166 @@ hr.separator {
     background: #2563eb;
 }
 
+/* Ajustes para páginas específicas */
+
+/* Dashboard (dashboard.html) */
+main > div.mb-6 {
+    padding-left: 1.5rem;
+    padding-right: 1.5rem; /* Restaura padding simétrico */
+}
+
+main > div.mb-6 h2 {
+    margin-left: 0; /* Garante que o texto não fique colado à borda esquerda */
+    margin-right: 0; /* Remove margem extra à direita */
+}
+
+main .grid.grid-cols-1.md\\:grid-cols-4 {
+    padding-left: 1.5rem;
+    padding-right: 1.5rem; /* Restaura padding simétrico */
+}
+
+/* Ajuste específico para a seção de Turmas Ativas no dashboard */
+.bg-white.border.border-blue-400.rounded-lg.shadow-md > .grid {
+    padding-left: 0 !important; /* Remove o padding-left extra para alinhar com o título */
+    padding-right: 0 !important; /* Remove o padding-right extra para alinhar com o título */
+}
+
+/* Pesquisa de Alunos (student_list.html) */
+main .border.border-blue-400 {
+    padding: 1rem 1.5rem; /* Restaura padding simétrico */
+}
+
+main .flex.justify-center.mb-6 {
+    padding-left: 1.5rem;
+    padding-right: 1.5rem; /* Restaura padding simétrico */
+}
+
+main .flex.justify-center.mb-6 button {
+    margin-right: 0; /* Remove margem extra à direita */
+}
+
+/* Estatísticas (reports.html) */
+main > div.mb-6 {
+    padding-left: 1.5rem;
+    padding-right: 1.5rem; /* Restaura padding simétrico */
+}
+
+main > div.mb-6 h2 {
+    margin-right: 0; /* Remove margem extra à direita */
+}
+
+#disciplinas-tab, #dias-tab, #taxa-tab {
+    padding: 1rem 1.5rem; /* Restaura padding simétrico */
+}
+
+/* Presenças (reports_presences.html) */
+#presences-section {
+    grid-template-columns: repeat(auto-fill, minmax(300px, 1fr)); /* Ajusta o grid para ocupar toda a largura */
+    gap: 1.5rem;
+    padding-left: 1.5rem;
+    padding-right: 1.5rem; /* Restaura padding simétrico */
+}
+
+/* Ocorrências (reports_occurrences.html) */
+#occurrences-section {
+    grid-template-columns: repeat(auto-fill, minmax(300px, 1fr)); /* Ajusta o grid para ocupar toda a largura */
+    gap: 1.5rem;
+    padding-left: 1.5rem;
+    padding-right: 1.5rem; /* Restaura padding simétrico */
+}
+
+/* Enturmar Alunos (enrollment.html) */
+.enrollment-container {
+    padding-left: 1.5rem !important;
+    padding-right: 1.5rem !important; /* Restaura padding simétrico */
+}
+
+.enrollment-container .border.border-blue-400 {
+    padding: 1rem 1.5rem; /* Restaura padding simétrico */
+}
+
+/* Gerenciamento de Turmas (classes.html) */
+main .bg-white.rounded-lg.shadow-md.overflow-hidden {
+    padding-left: 1.5rem;
+    padding-right: 1.5rem; /* Restaura padding simétrico */
+}
+
 /* Responsividade */
 @media (max-width: 768px) {
     .sidebar {
         width: 100%;
         height: auto;
-        position: relative;
+        position: relative; /* Remove a posição fixa em telas menores */
     }
 
     .container {
-        margin-left: 0;
         width: 100%;
     }
 
     header {
+        width: 100%; /* Ocupa toda a largura da viewport em telas menores */
         padding: 1rem;
+    }
+
+    header h1 {
+        margin-left: 0; /* Remove o deslocamento do título em telas menores */
+    }
+
+    main {
+        width: 100%; /* Ajusta a largura para telas menores */
+        padding: 1rem; /* Ajusta o padding para telas menores */
+    }
+
+    .grid {
+        grid-template-columns: repeat(auto-fill, minmax(280px, 1fr)); /* Mantém o comportamento responsivo */
+        padding: 1rem; /* Mantém padding simétrico em telas menores */
+    }
+
+    #active-classes {
+        grid-template-columns: repeat(auto-fill, minmax(280px, 1fr)); /* Mantém o comportamento responsivo */
+        padding: 1rem; /* Mantém padding simétrico em telas menores */
     }
 
     #active-classes .card {
         width: 100%;
         max-width: 280px;
         margin: 0 auto;
+    }
+
+    #presences-section, #occurrences-section {
+        grid-template-columns: repeat(auto-fill, minmax(300px, 1fr));
+        padding: 1rem; /* Mantém padding simétrico em telas menores */
+    }
+
+    .enrollment-container {
+        padding: 1rem !important; /* Mantém padding simétrico em telas menores */
+    }
+
+    .enrollment-container .border.border-blue-400 {
+        padding: 1rem; /* Mantém padding simétrico em telas menores */
+    }
+
+    main .bg-white.rounded-lg.shadow-md.overflow-hidden {
+        padding: 1rem; /* Mantém padding simétrico em telas menores */
+    }
+
+    .filter-grid {
+        padding: 1rem !important; /* Mantém padding simétrico em telas menores */
+    }
+
+    main > div.mb-6 {
+        padding: 1rem; /* Mantém padding simétrico em telas menores */
+    }
+
+    main .border.border-blue-400 {
+        padding: 1rem; /* Mantém padding simétrico em telas menores */
+    }
+
+    #disciplinas-tab, #dias-tab, #taxa-tab {
+        padding: 1rem; /* Mantém padding simétrico em telas menores */
+    }
+
+    main .flex.justify-center.mb-6 {
+        padding: 1rem; /* Mantém padding simétrico em telas menores */
     }
 }
