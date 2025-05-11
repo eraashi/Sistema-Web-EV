@@ -64,7 +64,16 @@
                     </div>
                 </div>
             </nav>
-            <div class="p-4 text-sm">Usuário: {{ user.nome if user else 'Admin' }}</div>
+            <div class="p-4 text-sm">
+                Polo Atual: 
+                {% if user and user.cargo in ['admin', 'secretaria'] %}
+                    Todos
+                {% elif user and user.polos.nome %}
+                    {{ user.polos.nome }}
+                {% else %}
+                    Desconhecido
+                {% endif %}
+            </div>
         </div>
         <!-- Main Content -->
         <div class="container flex-1 flex flex-col">
