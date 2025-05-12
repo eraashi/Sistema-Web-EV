@@ -1,5 +1,36 @@
 (function () {
     let classes = [];
+    let disciplinas = [];
+
+    // Função para buscar disciplinas
+    async function fetchDisciplinas() {
+        try {
+            const response = await fetch('/api/disciplinas', { credentials: 'include' });
+            if (!response.ok) {
+                const errorText = await response.text();
+                throw new Error(`Erro ao carregar disciplinas: ${errorText}`);
+            }
+            disciplinas = await response.json();
+            console.log('Disciplinas carregadas:', disciplinas);
+            populateDisciplinaSelect();
+        } catch (error) {
+            console.error('Erro em fetchDisciplinas:', error.message);
+            alert('Erro: ' + error.message);
+            window.location.href = '/login';
+        }
+    }
+
+    // Função para preencher o select de disciplinas
+    function populateDisciplinaSelect() {
+        const select = document.getElementById('create-disciplina-id');
+        select.innerHTML = '<option value="" disabled selected hidden>Escolha uma disciplina...</option>';
+        disciplinas.forEach(disciplina => {
+            const option = document.createElement('option');
+            option.value = disciplina.id;
+            option.textContent = disciplina.nome.charAt(0).toUpperCase() + disciplina.nome.slice(1);
+            select.appendChild(option);
+        });
+    }
 
     async function fetchClasses() {
         try {
@@ -69,11 +100,14 @@
                 const capitalizedName = capitalizeFirstLetter(firstName);
                 console.log(`Turma ${cls.name}: type=${cls.type}, typeClass=${typeClass}`);
                 const typeStyle = cls.type === 'motora' ? 'style="background-color: #f3e8ff"' : '';
-                // Renderizar o botão "Editar" apenas para admin, secretaria e coordenador
-                const editButton = (currentUserRole === 'admin' || currentUserRole === 'secretaria' || currentUserRole === 'coordenador')
+                // Renderizar os botões "Editar" e "Excluir" apenas para admin, secretaria e coordenador
+                const actionButtons = (currentUserRole === 'admin' || currentUserRole === 'secretaria' || currentUserRole === 'coordenador')
                     ? `<td class="px-6 py-4">
                            <button class="edit-button" data-index="${index}">
                                <i data-lucide="edit" class="h-4 w-4 mr-1"></i> Editar
+                           </button>
+                           <button class="delete-button" data-id="${cls.id}">
+                               <i data-lucide="trash-2" class="h-4 w-4 mr-1"></i> Excluir
                            </button>
                        </td>`
                     : '';
@@ -103,7 +137,7 @@
                                 <div class="bg-blue-600 h-2.5 rounded-full" style="width: ${(cls.enrollmentCount / cls.capacity * 100).toFixed(0)}%"></div>
                             </div>
                         </td>
-                        ${editButton}
+                        ${actionButtons}
                     </tr>
                 `;
             });
@@ -116,6 +150,17 @@
                     const index = button.getAttribute('data-index');
                     console.log('Botão "Editar" clicado, índice:', index);
                     openEditModal(index);
+                });
+            });
+
+            // Adicionar event listeners para os botões "Excluir"
+            const deleteButtons = document.querySelectorAll('.delete-button');
+            console.log('Botões "Excluir" encontrados:', deleteButtons.length);
+            deleteButtons.forEach(button => {
+                button.addEventListener('click', () => {
+                    const classId = button.getAttribute('data-id');
+                    console.log('Botão "Excluir" clicado, ID da turma:', classId);
+                    deleteClass(classId);
                 });
             });
         }
@@ -182,7 +227,7 @@
         // Preencher o formulário com os dados da turma
         document.getElementById('edit-class-id').value = cls.id || '';
         document.getElementById('edit-name').value = cls.name || '';
-        document.getElementById('edit-polo-name').value = cls.polo_name || 'POLO I (Porto da Roça)';
+        document.getElementById('edit-polo-name').value = cls.polo_name || userPoloName;
         document.getElementById('edit-type').value = cls.type || 'cognitiva';
 
         // Preencher o par de etapas com o valor exato da turma
@@ -274,6 +319,31 @@
         }
     }
 
+    async function deleteClass(classId) {
+        console.log('Iniciando exclusão da turma com ID:', classId);
+        if (!confirm('Tem certeza que deseja excluir esta turma? Todos os alunos matriculados serão desmatriculados.')) {
+            console.log('Exclusão cancelada pelo usuário');
+            return;
+        }
+
+        try {
+            const response = await fetch(`/api/turmas/${classId}`, {
+                method: 'DELETE',
+                headers: { 'Content-Type': 'application/json' },
+                credentials: 'include'
+            });
+            if (!response.ok) {
+                const errorText = await response.text();
+                throw new Error(`Erro ao excluir turma: ${errorText}`);
+            }
+            showToast('Turma excluída com sucesso!', 'success', 'check-circle', 3000);
+            fetchClasses(); // Recarregar a lista de turmas
+        } catch (error) {
+            console.error('Erro ao excluir turma:', error.message);
+            showToast('Erro: ' + error.message, 'error', 'alert-circle', 3000);
+        }
+    }
+
     function openCreateModal() {
         const modal = document.getElementById('create-class-modal');
         if (!modal) {
@@ -289,8 +359,8 @@
             tooltip.style.display = 'none';
         });
 
-        // Inicializar o ícone de tipo como "brain" (cognitiva)
-        updateTypeIcon('cognitiva');
+        // Inicializar o ícone de tipo com base na primeira disciplina
+        updateTypeIcon(disciplinas.length > 0 ? disciplinas[0].tipo : 'cognitiva');
         lucide.createIcons();
     }
 
@@ -346,7 +416,7 @@
         let hasError = false;
         const fields = [
             { id: 'name', message: 'Por favor, insira o nome da turma' },
-            { id: 'type', message: 'Por favor, selecione o tipo da turma' },
+            { id: 'disciplina_id', message: 'Por favor, selecione a disciplina da turma' },
             { id: 'day', message: 'Por favor, selecione o dia da semana' },
             { id: 'period', message: 'Por favor, selecione o período' },
             { id: 'grades', message: 'Por favor, selecione o ano escolar' },
@@ -513,15 +583,18 @@
         }
 
         // Adicionar event listener para alternar o ícone de tipo dinamicamente
-        const typeSelect = document.getElementById('create-type');
-        if (typeSelect) {
-            typeSelect.addEventListener('change', (event) => {
-                const selectedType = event.target.value;
-                console.log('Tipo selecionado:', selectedType);
-                updateTypeIcon(selectedType);
+        const disciplinaSelect = document.getElementById('create-disciplina-id');
+        if (disciplinaSelect) {
+            disciplinaSelect.addEventListener('change', (event) => {
+                const selectedDisciplinaId = event.target.value;
+                const selectedDisciplina = disciplinas.find(d => d.id === selectedDisciplinaId);
+                console.log('Disciplina selecionada:', selectedDisciplina);
+                updateTypeIcon(selectedDisciplina ? selectedDisciplina.tipo : 'cognitiva');
             });
         }
 
+        // Carregar disciplinas e turmas
+        fetchDisciplinas();
         fetchClasses();
 
         // Adicionar event listeners para os botões de filtro

@@ -53,6 +53,25 @@ def get_current_user():
         print(f"Erro em get_current_user: {str(e)}")
         return None
 
+# Função para registrar logs no Supabase
+def log_action(user_id, action_type, entity_type, entity_id=None, details=None):
+    try:
+        log_data = {
+            'user_id': user_id,
+            'action_type': action_type,
+            'entity_type': entity_type,
+            'entity_id': str(entity_id) if entity_id else None,
+            'details': details
+        }
+        print(f"Registrando log: {log_data}")
+        response = supabase.table('logs').insert(log_data).execute()
+        if not response.data:
+            print("Erro ao registrar log")
+        else:
+            print("Log registrado com sucesso")
+    except Exception as e:
+        print(f"Erro ao registrar log: {str(e)}")
+
 @app.route('/')
 def index():
     user = get_current_user()
@@ -134,6 +153,27 @@ def new_class():
     print(f"Usuário autenticado em /new_class: {user['id']}")
     return render_template('new_class.html', user=user)
 
+@app.route('/funcionarios')
+def funcionarios():
+    user = get_current_user()
+    if not user:
+        print("Nenhum usuário autenticado em /funcionarios, redirecionando para login")
+        return redirect(url_for('login'))
+    print(f"Usuário autenticado em /funcionarios: {user['id']}")
+    return render_template('funcionarios.html', user=user)
+
+@app.route('/logs')
+def logs():
+    user = get_current_user()
+    if not user:
+        print("Nenhum usuário autenticado em /logs, redirecionando para login")
+        return redirect(url_for('login'))
+    if user['cargo'] not in ['admin', 'secretaria']:
+        print("Erro: Usuário não tem permissão para acessar os logs")
+        return redirect(url_for('dashboard'))
+    print(f"Usuário autenticado em /logs: {user['id']}")
+    return render_template('logs.html', user=user)
+
 @app.route('/login', methods=['GET', 'POST'])
 def login():
     if request.method == 'POST':
@@ -155,6 +195,13 @@ def login():
             print(f"Funcionário autenticado: {funcionario['id']}")
             session['user_id'] = funcionario['id']
             print(f"Sessão atualizada: {session}")
+            # Registrar log de login
+            log_action(
+                user_id=funcionario['id'],
+                action_type='LOGIN',
+                entity_type='USER',
+                details={'cpf': cpf}
+            )
             return jsonify({'user': funcionario, 'redirect': url_for('dashboard')})
         except Exception as e:
             print(f"Erro no login: {str(e)}")
@@ -163,6 +210,15 @@ def login():
 
 @app.route('/logout', methods=['POST'])
 def logout():
+    user = get_current_user()
+    if user:
+        # Registrar log de logout
+        log_action(
+            user_id=user['id'],
+            action_type='LOGOUT',
+            entity_type='USER',
+            details={'cpf': user['cpf']}
+        )
     session.pop('user_id', None)
     print("Usuário deslogado, sessão limpa")
     return jsonify({'message': 'Logout successful'})
@@ -181,21 +237,50 @@ def get_presencas():
 
         # Filtrar com base no cargo do usuário
         if user['cargo'] in ['admin', 'secretaria']:
+            print("Usuário admin ou secretaria: retornando todas as presenças")
             presencas = execute_supabase_query(query)
         elif user['cargo'] in ['monitor', 'diretor', 'coordenador']:
+            # Verificar se o usuário tem um polo_id definido
+            if 'polo_id' not in user or not user['polo_id']:
+                print("Erro: Usuário sem polo_id definido")
+                return jsonify({'error': 'Usuário não tem polo associado'}), 400
+
             # Filtrar apenas presenças de turmas do polo do usuário
+            print(f"Filtrando presenças para o polo_id do usuário: {user['polo_id']}")
             presencas = execute_supabase_query(
                 query.match({'turmas.polo_id': user['polo_id']})
             )
         else:
+            print("Usuário sem permissão para visualizar presenças")
             presencas = []
 
-        print(f"Presenças retornadas: {presencas}")
+        print(f"Presenças retornadas do Supabase: {presencas}")
+
+        # Se não houver presenças, retornar uma lista vazia
+        if not presencas:
+            print("Nenhuma presença encontrada para o polo do usuário")
+            return jsonify([])
 
         result = []
         for presenca in presencas:
-            turma = presenca.get('turmas', {})
+            print(f"Processando presença: {presenca}")
+            # Verificar se 'turmas' existe e não é None
+            turma = presenca.get('turmas')
+            if not turma:
+                print(f"Turma não encontrada para a presença {presenca['id']}")
+                turma = {}
+
+            # Verificar se 'polos' existe dentro de 'turmas'
             polo = turma.get('polos', {}) if turma else {}
+            print(f"Dados da turma para presença {presenca['id']}: {turma}")
+
+            # Adicionar a presença ao resultado apenas se o polo_id da turma corresponder ao do usuário
+            if user['cargo'] in ['monitor', 'diretor', 'coordenador']:
+                turma_polo_id = turma.get('polo_id')
+                if turma_polo_id != user['polo_id']:
+                    print(f"Descartando presença {presenca['id']} - polo_id da turma ({turma_polo_id}) não corresponde ao polo_id do usuário ({user['polo_id']})")
+                    continue
+
             result.append({
                 'id': presenca['id'],
                 'id_aluno': presenca['id_aluno'],
@@ -232,22 +317,50 @@ def get_ocorrencias():
 
         # Filtrar com base no cargo do usuário
         if user['cargo'] in ['admin', 'secretaria']:
+            print("Usuário admin ou secretaria: retornando todas as ocorrências")
             ocorrencias = execute_supabase_query(query)
         elif user['cargo'] in ['monitor', 'diretor', 'coordenador']:
+            # Verificar se o usuário tem um polo_id definido
+            if 'polo_id' not in user or not user['polo_id']:
+                print("Erro: Usuário sem polo_id definido")
+                return jsonify({'error': 'Usuário não tem polo associado'}), 400
+
             # Filtrar apenas ocorrências de turmas do polo do usuário
+            print(f"Filtrando ocorrências para o polo_id do usuário: {user['polo_id']}")
             ocorrencias = execute_supabase_query(
                 query.match({'turmas.polo_id': user['polo_id']})
             )
         else:
+            print("Usuário sem permissão para visualizar ocorrências")
             ocorrencias = []
 
-        print(f"Ocorrências retornadas: {ocorrencias}")
+        print(f"Ocorrências retornadas do Supabase: {ocorrencias}")
+
+        # Se não houver ocorrências, retornar uma lista vazia
+        if not ocorrencias:
+            print("Nenhuma ocorrência encontrada para o polo do usuário")
+            return jsonify([])
 
         result = []
         for ocorrencia in ocorrencias:
-            turma = ocorrencia.get('turmas', {})
+            print(f"Processando ocorrência: {ocorrencia}")
+            # Verificar se 'turmas' existe e não é None
+            turma = ocorrencia.get('turmas')
+            if not turma:
+                print(f"Turma não encontrada para a ocorrência {ocorrencia['id']}")
+                turma = {}
+
+            # Verificar se 'polos' existe dentro de 'turmas'
             polo = turma.get('polos', {}) if turma else {}
             print(f"Dados da turma para ocorrência {ocorrencia['id']}: {turma}")
+
+            # Adicionar a ocorrência ao resultado apenas se o polo_id da turma corresponder ao do usuário
+            if user['cargo'] in ['monitor', 'diretor', 'coordenador']:
+                turma_polo_id = turma.get('polo_id')
+                if turma_polo_id != user['polo_id']:
+                    print(f"Descartando ocorrência {ocorrencia['id']} - polo_id da turma ({turma_polo_id}) não corresponde ao polo_id do usuário ({user['polo_id']})")
+                    continue
+
             result.append({
                 'id': ocorrencia['id'],
                 'turma_id': ocorrencia['turma_id'],
@@ -262,6 +375,340 @@ def get_ocorrencias():
         return jsonify(result)
     except Exception as e:
         print(f"Erro em get_ocorrencias: {str(e)}")
+        return jsonify({'error': str(e)}), 500
+
+@app.route('/api/funcionarios', methods=['GET', 'POST'])
+def manage_funcionarios():
+    user = get_current_user()
+    if not user:
+        print("Erro: Usuário não autenticado em /api/funcionarios")
+        return jsonify({'error': 'Unauthorized'}), 401
+
+    if request.method == 'GET':
+        try:
+            nome = request.args.get('nome', '').strip()
+            cargo = request.args.get('cargo', '').strip()
+            polo = request.args.get('polo', '').strip()
+
+            query = supabase.table('funcionarios').select('id, nome, cpf, cargo, polo_id, polos!funcionarios_polo_id_fkey(nome), unidade, created_at')
+
+            # Excluir funcionários com cargo "admin" ou "secretaria"
+            query = query.not_.in_('cargo', ['admin', 'secretaria'])
+
+            # Aplicar filtros
+            if nome:
+                query = query.ilike('nome', f'%{nome}%')
+            if cargo and cargo != 'tudo':
+                query = query.eq('cargo', cargo)
+            if polo and polo != 'tudo':
+                query = query.eq('polo_id', (
+                    supabase.table('polos').select('id').eq('nome', polo).execute().data[0]['id']
+                ))
+
+            # Filtrar com base no cargo do usuário
+            if user['cargo'] not in ['admin', 'secretaria']:
+                # Apenas admin e secretaria podem ver todos os funcionários
+                print("Erro: Usuário não tem permissão para acessar esta rota")
+                return jsonify({'error': 'Forbidden: Apenas admin ou secretaria podem acessar esta rota'}), 403
+
+            funcionarios = execute_supabase_query(query)
+
+            # Definir o fuso horário de São Paulo
+            sao_paulo_tz = pytz.timezone('America/Sao_Paulo')
+
+            result = []
+            for funcionario in funcionarios:
+                # Capitalizar o cargo
+                cargo = funcionario['cargo'].capitalize() if funcionario['cargo'] else 'Não especificado'
+
+                # Formatar a data de criação para o padrão brasileiro
+                created_at = 'Não especificado'
+                if funcionario.get('created_at'):
+                    try:
+                        # Converter a string de data para um objeto datetime
+                        created_at_dt = datetime.fromisoformat(funcionario['created_at'].replace('Z', '+00:00'))
+                        # Converter para o fuso horário de São Paulo
+                        created_at_dt = created_at_dt.astimezone(sao_paulo_tz)
+                        # Formatar a data no padrão brasileiro
+                        created_at = created_at_dt.strftime('%d/%m/%Y %H:%M:%S')
+                    except Exception as e:
+                        print(f"Erro ao formatar data de criação para {funcionario['id']}: {str(e)}")
+                        created_at = 'Formato inválido'
+
+                result.append({
+                    'id': funcionario['id'],
+                    'nome': funcionario['nome'],
+                    'cpf': funcionario['cpf'],
+                    'cargo': cargo,
+                    'polo_id': funcionario['polo_id'],
+                    'polo_nome': funcionario['polos']['nome'] if funcionario.get('polos') else 'Não especificado',
+                    'unidade': funcionario.get('unidade', 'Não especificado'),
+                    'created_at': created_at
+                })
+
+            print(f"Funcionários retornados: {result}")
+            return jsonify(result)
+        except Exception as e:
+            print(f"Erro em get_funcionarios: {str(e)}")
+            return jsonify({'error': str(e)}), 500
+
+    elif request.method == 'POST':
+        try:
+            # Apenas admin e secretaria podem criar funcionários
+            if user['cargo'] not in ['admin', 'secretaria']:
+                print("Erro: Usuário não tem permissão para acessar esta rota")
+                return jsonify({'error': 'Forbidden: Apenas admin ou secretaria podem acessar esta rota'}), 403
+
+            data = request.json
+            print(f"Dados recebidos para criação de funcionário: {data}")
+
+            # Preparar os dados para inserção
+            funcionario_data = {
+                'nome': data.get('nome'),
+                'cpf': data.get('cpf'),
+                'cargo': data.get('cargo'),
+                'polo_id': supabase.table('polos').select('id').eq('nome', data.get('polo_name')).execute().data[0]['id'],
+                'unidade': data.get('unidade') or None,
+                'senha': '12345678'  # Senha padrão para novos funcionários
+            }
+
+            # Remover campos que não devem ser inseridos se não fornecidos
+            funcionario_data = {k: v for k, v in funcionario_data.items() if v is not None}
+            print(f"Dados para inserção no Supabase: {funcionario_data}")
+
+            # Inserir o funcionário no Supabase
+            response = supabase.table('funcionarios').insert(funcionario_data).execute()
+            if not response.data:
+                print("Erro ao criar funcionário")
+                return jsonify({'error': 'Erro ao criar funcionário'}), 500
+
+            # Registrar log da criação
+            log_action(
+                user_id=user['id'],
+                action_type='CREATE',
+                entity_type='FUNCIONARIO',
+                entity_id=response.data[0]['id'],
+                details={'nome': data.get('nome'), 'cpf': data.get('cpf'), 'cargo': data.get('cargo')}
+            )
+
+            print(f"Funcionário criado com sucesso: {response.data}")
+            return jsonify({'message': 'Funcionário criado com sucesso', 'funcionario': response.data[0]})
+        except Exception as e:
+            print(f"Erro em create_funcionario: {str(e)}")
+            return jsonify({'error': str(e)}), 500
+
+@app.route('/api/funcionarios/<id>', methods=['GET', 'PATCH', 'DELETE'])
+def manage_funcionario(id):
+    user = get_current_user()
+    if not user:
+        print("Erro: Usuário não autenticado em /api/funcionarios/<id>")
+        return jsonify({'error': 'Unauthorized'}), 401
+
+    if request.method == 'GET':
+        try:
+            # Apenas admin e secretaria podem acessar os detalhes de funcionários
+            if user['cargo'] not in ['admin', 'secretaria']:
+                print("Erro: Usuário não tem permissão para acessar esta rota")
+                return jsonify({'error': 'Forbidden: Apenas admin ou secretaria podem acessar esta rota'}), 403
+
+            # Buscar os detalhes do funcionário
+            funcionario = execute_supabase_query(
+                supabase.table('funcionarios')
+                .select('id, nome, cpf, cargo, polo_id, polos!funcionarios_polo_id_fkey(nome), unidade, created_at')
+                .eq('id', id)
+                .single()
+            )
+
+            if not funcionario:
+                print(f"Funcionário com ID {id} não encontrado")
+                return jsonify({'error': 'Funcionário não encontrado'}), 404
+
+            # Buscar os logs associados ao funcionário
+            logs_query = supabase.table('logs').select(
+                'id, action_type, entity_type, entity_id, details, created_at'
+            ).eq('user_id', id).order('created_at', desc=True).limit(50)
+
+            logs = execute_supabase_query(logs_query)
+            print(f"Logs retornados para o funcionário {id}: {logs}")
+
+            # Definir o fuso horário de São Paulo
+            sao_paulo_tz = pytz.timezone('America/Sao_Paulo')
+
+            # Capitalizar o cargo
+            cargo = funcionario['cargo'].capitalize() if funcionario['cargo'] else 'Não especificado'
+
+            # Formatar a data de criação para o padrão brasileiro
+            created_at = 'Não especificado'
+            if funcionario.get('created_at'):
+                try:
+                    # Converter a string de data para um objeto datetime
+                    created_at_dt = datetime.fromisoformat(funcionario['created_at'].replace('Z', '+00:00'))
+                    # Converter para o fuso horário de São Paulo
+                    created_at_dt = created_at_dt.astimezone(sao_paulo_tz)
+                    # Formatar a data no padrão brasileiro
+                    created_at = created_at_dt.strftime('%d/%m/%Y %H:%M:%S')
+                except Exception as e:
+                    print(f"Erro ao formatar data de criação para {funcionario['id']}: {str(e)}")
+                    created_at = 'Formato inválido'
+
+            # Formatar os logs para o padrão brasileiro
+            formatted_logs = []
+            for log in logs:
+                log_created_at = 'Não especificado'
+                if log.get('created_at'):
+                    try:
+                        log_created_at_dt = datetime.fromisoformat(log['created_at'].replace('Z', '+00:00'))
+                        log_created_at_dt = log_created_at_dt.astimezone(sao_paulo_tz)
+                        log_created_at = log_created_at_dt.strftime('%d/%m/%Y %H:%M:%S')
+                    except Exception as e:
+                        print(f"Erro ao formatar data do log {log['id']}: {str(e)}")
+                        log_created_at = 'Formato inválido'
+
+                formatted_logs.append({
+                    'id': log['id'],
+                    'action_type': log['action_type'],
+                    'entity_type': log['entity_type'],
+                    'entity_id': log['entity_id'],
+                    'details': log['details'],
+                    'created_at': log_created_at
+                })
+
+            result = {
+                'nome': funcionario['nome'],
+                'cpf': funcionario['cpf'],
+                'cargo': cargo,
+                'polo_id': funcionario['polo_id'],
+                'polo_nome': funcionario['polos']['nome'] if funcionario.get('polos') else 'Não especificado',
+                'unidade': funcionario.get('unidade', 'Não especificado'),
+                'created_at': created_at,
+                'logs': formatted_logs
+            }
+
+            print(f"Detalhes do funcionário retornados: {result}")
+            return jsonify(result)
+        except Exception as e:
+            print(f"Erro em get_funcionario_details: {str(e)}")
+            return jsonify({'error': str(e)}), 500
+
+    elif request.method == 'PATCH':
+        try:
+            # Apenas admin e secretaria podem atualizar funcionários
+            if user['cargo'] not in ['admin', 'secretaria']:
+                print("Erro: Usuário não tem permissão para acessar esta rota")
+                return jsonify({'error': 'Forbidden: Apenas admin ou secretaria podem acessar esta rota'}), 403
+
+            data = request.json
+            print(f"Dados recebidos para atualização do funcionário {id}: {data}")
+
+            # Buscar dados antigos para o log
+            old_data = execute_supabase_query(
+                supabase.table('funcionarios')
+                .select('nome, cpf, cargo, polo_id, polos!funcionarios_polo_id_fkey(nome), unidade')
+                .eq('id', id)
+                .single()
+            )
+
+            # Preparar os dados para atualização
+            update_data = {
+                'nome': data.get('nome'),
+                'cpf': data.get('cpf'),
+                'cargo': data.get('cargo'),
+                'polo_id': supabase.table('polos').select('id').eq('nome', data.get('polo_name')).execute().data[0]['id'],
+                'unidade': data.get('unidade')
+            }
+
+            # Remover campos que não devem ser atualizados se não fornecidos
+            update_data = {k: v for k, v in update_data.items() if v is not None}
+            print(f"Dados para atualização no Supabase: {update_data}")
+
+            # Atualizar o funcionário no Supabase
+            response = supabase.table('funcionarios').update(update_data).eq('id', id).execute()
+            if not response.data:
+                print(f"Funcionário com ID {id} não encontrado")
+                return jsonify({'error': 'Funcionário não encontrado'}), 404
+
+            # Registrar log da atualização
+            log_action(
+                user_id=user['id'],
+                action_type='UPDATE',
+                entity_type='FUNCIONARIO',
+                entity_id=id,
+                details={
+                    'old_data': {
+                        'nome': old_data['nome'],
+                        'cpf': old_data['cpf'],
+                        'cargo': old_data['cargo'],
+                        'polo_nome': old_data['polos']['nome'],
+                        'unidade': old_data['unidade']
+                    },
+                    'new_data': update_data
+                }
+            )
+
+            print(f"Funcionário com ID {id} atualizado com sucesso")
+            return jsonify({'message': 'Funcionário atualizado com sucesso'})
+        except Exception as e:
+            print(f"Erro em update_funcionario: {str(e)}")
+            return jsonify({'error': str(e)}), 500
+
+    elif request.method == 'DELETE':
+        try:
+            # Apenas admin e secretaria podem excluir funcionários
+            if user['cargo'] not in ['admin', 'secretaria']:
+                print("Erro: Usuário não tem permissão para acessar esta rota")
+                return jsonify({'error': 'Forbidden: Apenas admin ou secretaria podem acessar esta rota'}), 403
+
+            # Buscar dados do funcionário para o log
+            funcionario = execute_supabase_query(
+                supabase.table('funcionarios')
+                .select('id, nome, cpf, cargo, polo_id, polos!funcionarios_polo_id_fkey(nome), unidade')
+                .eq('id', id)
+                .single()
+            )
+
+            if not funcionario:
+                print(f"Funcionário com ID {id} não encontrado")
+                return jsonify({'error': 'Funcionário não encontrado'}), 404
+
+            # Excluir o funcionário do Supabase
+            response = supabase.table('funcionarios').delete().eq('id', id).execute()
+
+            # Registrar log da exclusão
+            log_action(
+                user_id=user['id'],
+                action_type='DELETE',
+                entity_type='FUNCIONARIO',
+                entity_id=id,
+                details={
+                    'nome': funcionario['nome'],
+                    'cpf': funcionario['cpf'],
+                    'cargo': funcionario['cargo'],
+                    'polo_nome': funcionario['polos']['nome'],
+                    'unidade': funcionario['unidade']
+                }
+            )
+
+            print(f"Funcionário com ID {id} excluído com sucesso")
+            return jsonify({'message': 'Funcionário excluído com sucesso'})
+        except Exception as e:
+            print(f"Erro em delete_funcionario: {str(e)}")
+            return jsonify({'error': str(e)}), 500
+
+@app.route('/api/polos', methods=['GET'])
+def get_polos():
+    user = get_current_user()
+    if not user:
+        print("Erro: Usuário não autenticado em /api/polos")
+        return jsonify({'error': 'Unauthorized'}), 401
+    try:
+        polos = execute_supabase_query(
+            supabase.table('polos').select('id, nome')
+        )
+        result = [{'id': polo['id'], 'nome': polo['nome']} for polo in polos]
+        print(f"Polos retornados: {result}")
+        return jsonify(result)
+    except Exception as e:
+        print(f"Erro em get_polos: {str(e)}")
         return jsonify({'error': str(e)}), 500
 
 @app.route('/api/alunos', methods=['GET'])
@@ -442,6 +889,15 @@ def update_aluno(id):
     try:
         data = request.json
         print(f"Dados recebidos para atualização de aluno: {data}")
+
+        # Buscar dados antigos para o log
+        old_data = execute_supabase_query(
+            supabase.table('alunos')
+            .select('nome, polo_id, polos(nome), unidade, genero, pcd, etapa, turno, data_nascimento')
+            .eq('id', id)
+            .single()
+        )
+
         update_data = {
             'nome': data.get('name'),
             'polo_id': supabase.table('polos').select('id').eq('nome', data.get('polo_name')).execute().data[0]['id'],
@@ -455,12 +911,33 @@ def update_aluno(id):
         # Remover campos que não devem ser atualizados se não fornecidos
         update_data = {k: v for k, v in update_data.items() if v is not None}
         print(f"Dados para atualização no Supabase (aluno): {update_data}")
-        
+
         response = supabase.table('alunos').update(update_data).eq('id', id).execute()
         if not response.data:
             print(f"Aluno com ID {id} não encontrado")
             return jsonify({'error': 'Aluno não encontrado'}), 404
-        
+
+        # Registrar log da atualização
+        log_action(
+            user_id=user['id'],
+            action_type='UPDATE',
+            entity_type='ALUNO',
+            entity_id=id,
+            details={
+                'old_data': {
+                    'nome': old_data['nome'],
+                    'polo_nome': old_data['polos']['nome'],
+                    'unidade': old_data['unidade'],
+                    'genero': old_data['genero'],
+                    'pcd': old_data['pcd'],
+                    'etapa': old_data['etapa'],
+                    'turno': old_data['turno'],
+                    'data_nascimento': old_data['data_nascimento']
+                },
+                'new_data': update_data
+            }
+        )
+
         print(f"Aluno com ID {id} atualizado com sucesso")
         return jsonify({'message': 'Aluno atualizado com sucesso'})
     except Exception as e:
@@ -476,13 +953,23 @@ def unenroll_aluno(id):
         return jsonify({'error': 'Unauthorized'}), 401
     try:
         # Verificar se o aluno existe
-        aluno = supabase.table('alunos').select('id').eq('id', id).execute().data
+        aluno = supabase.table('alunos').select('id, nome').eq('id', id).execute().data
         if not aluno:
             print(f"Aluno com ID {id} não encontrado")
             return jsonify({'error': 'Aluno não encontrado'}), 404
 
         # Remover todas as matrículas do aluno
         supabase.table('matriculas').delete().eq('aluno_id', id).execute()
+
+        # Registrar log da desmatriculação
+        log_action(
+            user_id=user['id'],
+            action_type='DELETE',
+            entity_type='MATRICULA',
+            entity_id=id,
+            details={'aluno_nome': aluno[0]['nome']}
+        )
+
         print(f"Aluno com ID {id} desenturmado com sucesso")
         return jsonify({'message': 'Aluno desenturmado com sucesso'})
     except Exception as e:
@@ -736,13 +1223,33 @@ def get_turmas():
         data = request.json
         print(f"Dados recebidos para criação de turma: {data}")
         try:
-            # Buscar o disciplina_id correspondente ao tipo da disciplina
-            disciplina = supabase.table('disciplinas').select('id').eq('tipo', data['type']).execute().data
-            if not disciplina or len(disciplina) == 0:
-                print(f"Disciplina do tipo {data['type']} não encontrada")
-                return jsonify({'error': f"Disciplina do tipo {data['type']} não encontrada"}), 400
-            disciplina_id = disciplina[0]['id']
-            print(f"Disciplina ID encontrada para tipo {data['type']}: {disciplina_id}")
+            # Verificar se disciplina_id foi fornecido
+            if 'disciplina_id' not in data or not data['disciplina_id']:
+                print("Erro: disciplina_id não fornecido")
+                return jsonify({'error': 'disciplina_id é obrigatório'}), 400
+
+            disciplina_id = data['disciplina_id']
+            print(f"Disciplina ID recebida: {disciplina_id}")
+
+            # Verificar se a disciplina existe
+            disciplina = execute_supabase_query(
+                supabase.table('disciplinas').select('id, nome, tipo').eq('id', disciplina_id).single()
+            )
+            if not disciplina:
+                print(f"Disciplina com ID {disciplina_id} não encontrada")
+                return jsonify({'error': f"Disciplina com ID {disciplina_id} não encontrada"}), 400
+
+            tipo = disciplina['tipo']
+            print(f"Tipo da disciplina: {tipo}")
+
+            # Verificar se polo_id existe
+            polo_query = supabase.table('polos').select('id').eq('nome', data['polo_name'])
+            polo = execute_supabase_query(polo_query)
+            if not polo:
+                print(f"Polo com nome {data['polo_name']} não encontrado")
+                return jsonify({'error': f"Polo com nome {data['polo_name']} não encontrado"}), 400
+            polo_id = polo[0]['id']
+            print(f"Polo ID encontrado: {polo_id}")
 
             # Inserir a nova turma no Supabase
             turma_data = {
@@ -752,15 +1259,30 @@ def get_turmas():
                 'dia_semana': data['day'],
                 'periodo': data['period'],
                 'capacidade': int(data['capacity']),
-                'polo_id': supabase.table('polos').select('id').eq('nome', data['polo_name']).execute().data[0]['id']
+                'polo_id': polo_id
             }
             print(f"Dados para inserção no Supabase: {turma_data}")
             turma = supabase.table('turmas').insert(turma_data).execute().data[0]
             print(f"Turma criada com sucesso: {turma}")
+
+            # Registrar log da criação
+            log_action(
+                user_id=user['id'],
+                action_type='CREATE',
+                entity_type='TURMA',
+                entity_id=turma['id'],
+                details={
+                    'nome': turma['nome'],
+                    'disciplina_nome': disciplina['nome'],
+                    'tipo': tipo,
+                    'polo_nome': data['polo_name']
+                }
+            )
+
             return jsonify({
                 'id': turma['id'],
                 'name': turma['nome'],
-                'type': data['type'],
+                'type': tipo,
                 'grades': turma['faixa_etaria'],
                 'day': turma['dia_semana'],
                 'period': turma['periodo'],
@@ -771,37 +1293,106 @@ def get_turmas():
             print(f"Erro em criar turma (POST): {str(e)}")
             return jsonify({'error': str(e)}), 500
 
-@app.route('/api/turmas/<id>', methods=['PATCH'])
+@app.route('/api/turmas/<id>', methods=['PATCH', 'DELETE'])
 def update_turma(id):
-    print(f"Requisição recebida para /api/turmas/{id} com método PATCH")
+    print(f"Requisição recebida para /api/turmas/{id} com método {request.method}")
     user = get_current_user()
     if not user:
         print("Erro: Usuário não autenticado em /api/turmas/<id>")
         return jsonify({'error': 'Unauthorized'}), 401
-    try:
-        data = request.json
-        print(f"Dados recebidos para atualização: {data}")
-        update_data = {
-            'nome': data.get('name'),
-            'faixa_etaria': data.get('grades'),  # Já é um array vindo do frontend
-            'dia_semana': data.get('day'),
-            'periodo': data.get('period'),
-            'capacidade': int(data.get('capacity'))
-        }
-        # Remover campos que não devem ser atualizados se não fornecidos
-        update_data = {k: v for k, v in update_data.items() if v is not None}
-        print(f"Dados para atualização no Supabase: {update_data}")
-        
-        response = supabase.table('turmas').update(update_data).eq('id', id).execute()
-        if not response.data:
-            print(f"Turma com ID {id} não encontrada no Supabase")
-            return jsonify({'error': 'Turma não encontrada'}), 404
-        
-        print(f"Turma com ID {id} atualizada com sucesso")
-        return jsonify({'message': 'Turma atualizada com sucesso'})
-    except Exception as e:
-        print(f"Erro em update_turma: {str(e)}")
-        return jsonify({'error': str(e)}), 500
+
+    if request.method == 'PATCH':
+        try:
+            data = request.json
+            print(f"Dados recebidos para atualização: {data}")
+
+            # Buscar dados antigos para o log
+            old_data = execute_supabase_query(
+                supabase.table('turmas')
+                .select('nome, faixa_etaria, dia_semana, periodo, capacidade, polos!turmas_polo_id_fkey(nome)')
+                .eq('id', id)
+                .single()
+            )
+
+            update_data = {
+                'nome': data.get('name'),
+                'faixa_etaria': data.get('grades'),  # Já é um array vindo do frontend
+                'dia_semana': data.get('day'),
+                'periodo': data.get('period'),
+                'capacidade': int(data['capacity'])
+            }
+
+            # Remover campos que não devem ser atualizados se não fornecidos
+            update_data = {k: v for k, v in update_data.items() if v is not None}
+            print(f"Dados para atualização no Supabase: {update_data}")
+
+            response = supabase.table('turmas').update(update_data).eq('id', id).execute()
+            if not response.data:
+                print(f"Turma com ID {id} não encontrada no Supabase")
+                return jsonify({'error': 'Turma não encontrada'}), 404
+
+            # Registrar log da atualização
+            log_action(
+                user_id=user['id'],
+                action_type='UPDATE',
+                entity_type='TURMA',
+                entity_id=id,
+                details={
+                    'old_data': {
+                        'nome': old_data['nome'],
+                        'faixa_etaria': old_data['faixa_etaria'],
+                        'dia_semana': old_data['dia_semana'],
+                        'periodo': old_data['periodo'],
+                        'capacidade': old_data['capacidade'],
+                        'polo_nome': old_data['polos']['nome']
+                    },
+                    'new_data': update_data
+                }
+            )
+
+            print(f"Turma com ID {id} atualizada com sucesso")
+            return jsonify({'message': 'Turma atualizada com sucesso'})
+        except Exception as e:
+            print(f"Erro em update_turma: {str(e)}")
+            return jsonify({'error': str(e)}), 500
+
+    elif request.method == 'DELETE':
+        try:
+            # Buscar dados da turma para o log
+            turma = execute_supabase_query(
+                supabase.table('turmas')
+                .select('id, nome, polos!turmas_polo_id_fkey(nome)')
+                .eq('id', id)
+                .single()
+            )
+
+            if not turma:
+                print(f"Turma com ID {id} não encontrada")
+                return jsonify({'error': 'Turma não encontrada'}), 404
+
+            # Remover todas as matrículas da turma antes de excluí-la
+            supabase.table('matriculas').delete().eq('turma_id', id).execute()
+
+            # Excluir a turma do Supabase
+            response = supabase.table('turmas').delete().eq('id', id).execute()
+
+            # Registrar log da exclusão
+            log_action(
+                user_id=user['id'],
+                action_type='DELETE',
+                entity_type='TURMA',
+                entity_id=id,
+                details={
+                    'turma_nome': turma['nome'],
+                    'polo_nome': turma['polos']['nome']
+                }
+            )
+
+            print(f"Turma com ID {id} excluída com sucesso")
+            return jsonify({'message': 'Turma excluída com sucesso'})
+        except Exception as e:
+            print(f"Erro em delete_turma: {str(e)}")
+            return jsonify({'error': str(e)}), 500
 
 @app.route('/api/turmas/<id>/unenroll', methods=['DELETE'])
 def unenroll_turma(id):
@@ -812,13 +1403,26 @@ def unenroll_turma(id):
         return jsonify({'error': 'Unauthorized'}), 401
     try:
         # Verificar se a turma existe
-        turma = supabase.table('turmas').select('id').eq('id', id).execute().data
+        turma = supabase.table('turmas').select('id, nome, polos!turmas_polo_id_fkey(nome)').eq('id', id).execute().data
         if not turma:
             print(f"Turma com ID {id} não encontrada")
             return jsonify({'error': 'Turma não encontrada'}), 404
 
         # Remover todas as matrículas da turma
         supabase.table('matriculas').delete().eq('turma_id', id).execute()
+
+        # Registrar log da desmatriculação
+        log_action(
+            user_id=user['id'],
+            action_type='DELETE',
+            entity_type='MATRICULA',
+            entity_id=id,
+            details={
+                'turma_nome': turma[0]['nome'],
+                'polo_nome': turma[0]['polos']['nome']
+            }
+        )
+
         print(f"Alunos desmatriculados da turma com ID {id}")
         return jsonify({'message': 'Alunos desmatriculados com sucesso'})
     except Exception as e:
@@ -908,7 +1512,7 @@ def get_turmas_ativas():
     except Exception as e:
         print(f"Erro em get_turmas_ativas: {str(e)}")
         return jsonify({'error': str(e)}), 500
-    
+
 @app.route('/api/matriculas', methods=['GET', 'POST'])
 def manage_matriculas():
     user = get_current_user()
@@ -955,6 +1559,28 @@ def manage_matriculas():
                 })
             )[0]
             print(f"Nova matrícula criada: {matricula}")
+
+            # Buscar detalhes para o log
+            aluno = execute_supabase_query(
+                supabase.table('alunos').select('nome').eq('id', data['alunoId']).single()
+            )
+            turma = execute_supabase_query(
+                supabase.table('turmas').select('nome, polos!turmas_polo_id_fkey(nome)').eq('id', data['turmaId']).single()
+            )
+
+            # Registrar log da criação da matrícula
+            log_action(
+                user_id=user['id'],
+                action_type='CREATE',
+                entity_type='MATRICULA',
+                entity_id=matricula['id'],
+                details={
+                    'aluno_nome': aluno['nome'],
+                    'turma_nome': turma['nome'],
+                    'polo_nome': turma['polos']['nome']
+                }
+            )
+
             return jsonify({
                 'id': matricula['id'],
                 'studentId': matricula['aluno_id'],
@@ -988,10 +1614,111 @@ def delete_matricula(id):
             if matricula['turmas']['polo_id'] != user['polo_id']:
                 return jsonify({'error': 'Forbidden: Você não tem permissão para remover matrículas deste polo'}), 403
 
+        # Buscar detalhes para o log
+        matricula_details = execute_supabase_query(
+            supabase.table('matriculas')
+            .select('aluno_id, alunos(nome), turma_id, turmas(nome, polos!turmas_polo_id_fkey(nome))')
+            .eq('id', id)
+            .single()
+        )
+
         supabase.table('matriculas').delete().eq('id', id).execute()
+
+        # Registrar log da exclusão da matrícula
+        log_action(
+            user_id=user['id'],
+            action_type='DELETE',
+            entity_type='MATRICULA',
+            entity_id=id,
+            details={
+                'aluno_nome': matricula_details['alunos']['nome'],
+                'turma_nome': matricula_details['turmas']['nome'],
+                'polo_nome': matricula_details['turmas']['polos']['nome']
+            }
+        )
+
         return jsonify({'message': 'Matrícula removida com sucesso'})
     except Exception as e:
         print(f"Erro em delete_matricula: {str(e)}")
+        return jsonify({'error': str(e)}), 500
+
+@app.route('/api/logs', methods=['GET'])
+def get_logs():
+    user = get_current_user()
+    if not user:
+        print("Erro: Usuário não autenticado em /api/logs")
+        return jsonify({'error': 'Unauthorized'}), 401
+
+    if user['cargo'] not in ['admin', 'secretaria']:
+        print("Erro: Usuário não tem permissão para acessar os logs")
+        return jsonify({'error': 'Forbidden: Apenas admin ou secretaria podem acessar os logs'}), 403
+
+    try:
+        # Buscar logs com informações do usuário
+        query = supabase.table('logs').select('*, funcionarios(nome, cargo)').order('created_at', desc=True)
+
+        # Filtros
+        user_id = request.args.get('user_id', '').strip()
+        action_type = request.args.get('action_type', '').strip()
+        entity_type = request.args.get('entity_type', '').strip()
+
+        if user_id:
+            query = query.eq('user_id', user_id)
+        if action_type:
+            query = query.eq('action_type', action_type)
+        if entity_type:
+            query = query.eq('entity_type', entity_type)
+
+        logs = execute_supabase_query(query)
+
+        # Definir o fuso horário de São Paulo
+        sao_paulo_tz = pytz.timezone('America/Sao_Paulo')
+
+        result = []
+        for log in logs:
+            created_at = 'Não especificado'
+            if log.get('created_at'):
+                try:
+                    created_at_dt = datetime.fromisoformat(log['created_at'].replace('Z', '+00:00'))
+                    created_at_dt = created_at_dt.astimezone(sao_paulo_tz)
+                    created_at = created_at_dt.strftime('%d/%m/%Y %H:%M:%S')
+                except Exception as e:
+                    print(f"Erro ao formatar data de criação para log {log['id']}: {str(e)}")
+                    created_at = 'Formato inválido'
+
+            result.append({
+                'id': log['id'],
+                'user_id': log['user_id'],
+                'user_name': log['funcionarios']['nome'],
+                'user_cargo': log['funcionarios']['cargo'].capitalize(),
+                'action_type': log['action_type'],
+                'entity_type': log['entity_type'],
+                'entity_id': log['entity_id'],
+                'details': log['details'],
+                'created_at': created_at
+            })
+
+        print(f"Logs retornados: {result}")
+        return jsonify(result)
+    except Exception as e:
+        print(f"Erro em get_logs: {str(e)}")
+        return jsonify({'error': str(e)}), 500
+
+@app.route('/api/disciplinas', methods=['GET'])
+def get_disciplinas():
+    user = get_current_user()
+    if not user:
+        print("Erro: Usuário não autenticado em /api/disciplinas")
+        return jsonify({'error': 'Unauthorized'}), 401
+    try:
+        disciplinas = execute_supabase_query(
+            supabase.table('disciplinas').select('id, nome, tipo')
+        )
+        result = [{'id': disciplina['id'], 'nome': disciplina['nome'], 'tipo': disciplina['tipo']} for disciplina in disciplinas]
+        print(f"Disciplinas retornadas: {result}")
+        return jsonify(result)
+    except Exception as e:
+        print(f"Erro em get_disciplinas: {str(e)}")
         return jsonify({'error': str(e)}), 500
 
 if __name__ == '__main__':
