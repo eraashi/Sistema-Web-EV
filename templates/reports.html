@@ -5,170 +5,177 @@
 {% block header %}Estatísticas{% endblock %}
 
 {% block content %}
-<!-- Filtros -->
-<div class="grid grid-cols-1 md:grid-cols-3 gap-4 mb-6">
-    <div>
-        <label class="block text-sm font-medium mb-1">Polo</label>
-        <select id="polo-select" class="w-full p-2 border rounded-md">
-            <option value="all">Todos os polos</option>
-        </select>
-    </div>
-    <div>
-        <label class="block text-sm font-medium mb-1">Data Inicial</label>
-        <input id="start-date" type="text" class="w-full p-2 border rounded-md" placeholder="Selecione a data inicial">
-    </div>
-    <div>
-        <label class="block text-sm font-medium mb-1">Data Final</label>
-        <input id="end-date" type="text" class="w-full p-2 border rounded-md" placeholder="Selecione a data final">
-    </div>
+<!-- Overlay de Carregamento -->
+<div id="loading-overlay" class="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50">
+    <div class="w-12 h-12 border-4 border-blue-600 border-t-transparent rounded-full animate-spin"></div>
 </div>
 
-<!-- Cards de Resumo -->
-<div class="grid grid-cols-1 md:grid-cols-4 gap-6 mb-6">
-    <div class="bg-white p-4 rounded-lg shadow-md cursor-pointer" onclick="showTab('distribuicao')">
-        <h3 class="text-sm font-medium text-gray-500 mb-2">Total de Alunos</h3>
-        <p id="total-alunos" class="text-2xl font-bold">0</p>
-    </div>
-    <div class="bg-white p-4 rounded-lg shadow-md cursor-pointer" onclick="showTab('frequencia')">
-        <h3 class="text-sm font-medium text-gray-500 mb-2">Média de Frequência</h3>
-        <p id="media-frequencia" class="text-2xl font-bold">0%</p>
-    </div>
-    <div class="bg-white p-4 rounded-lg shadow-md cursor-pointer" onclick="showTab('movimentacao')">
-        <h3 class="text-sm font-medium text-gray-500 mb-2">Alunos Novos (2025)</h3>
-        <p id="alunos-novos" class="text-2xl font-bold">0</p>
-    </div>
-    <div class="bg-white p-4 rounded-lg shadow-md cursor-pointer" onclick="showTab('movimentacao')">
-        <h3 class="text-sm font-medium text-gray-500 mb-2">Trocas de Turma</h3>
-        <p id="trocas-turma" class="text-2xl font-bold">0</p>
-    </div>
-</div>
-
-<!-- Abas -->
-<div class="mb-6">
-    <div class="flex space-x-2 flex-wrap">
-        <button onclick="showTab('distribuicao')" class="bg-blue-600 text-white px-4 py-2 rounded-md hover:bg-blue-700">Distribuição</button>
-        <button onclick="showTab('frequencia')" class="bg-gray-200 text-gray-700 px-4 py-2 rounded-md hover:bg-gray-300">Frequência</button>
-        <button onclick="showTab('movimentacao')" class="bg-gray-200 text-gray-700 px-4 py-2 rounded-md hover:bg-gray-300">Movimentação</button>
-        <button onclick="showTab('taxa')" class="bg-gray-200 text-gray-700 px-4 py-2 rounded-md hover:bg-gray-300">Taxa de Ocupação Geral</button>
-        <button onclick="showTab('ativas')" class="bg-gray-200 text-gray-700 px-4 py-2 rounded-md hover:bg-gray-300">Turmas Ativas</button>
-    </div>
-</div>
-
-<!-- Aba Distribuição -->
-<div id="distribuicao-tab" class="bg-white p-4 rounded-lg shadow-md">
-    <h3 class="text-lg font-semibold mb-4">Distribuição</h3>
-    <div class="grid grid-cols-1 md:grid-cols-2 gap-6">
+<!-- Conteúdo Principal (bloqueado durante carregamento) -->
+<div id="main-content" class="pointer-events-none">
+    <!-- Filtros -->
+    <div class="grid grid-cols-1 md:grid-cols-3 gap-4 mb-6">
         <div>
-            <h4 class="text-md font-semibold mb-2">Alunos por Disciplina</h4>
-            <canvas id="alunos-por-disciplina-chart" style="max-height: 300px;"></canvas>
+            <label class="block text-sm font-medium mb-1">Polo</label>
+            <select id="polo-select" class="w-full p-2 border rounded-md">
+                <option value="all">Todos os polos</option>
+            </select>
         </div>
         <div>
-            <h4 class="text-md font-semibold mb-2">Alunos por Período</h4>
-            <canvas id="alunos-por-periodo-chart" style="max-height: 300px;"></canvas>
+            <label class="block text-sm font-medium mb-1">Data Inicial</label>
+            <input id="start-date" type="text" class="w-full p-2 border rounded-md" placeholder="Selecione a data inicial">
         </div>
-        <div class="md:col-span-2">
-            <h4 class="text-md font-semibold mb-2">Alunos por Faixa Etária</h4>
-            <canvas id="alunos-por-faixa-etaria-chart" style="max-height: 300px;"></canvas>
+        <div>
+            <label class="block text-sm font-medium mb-1">Data Final</label>
+            <input id="end-date" type="text" class="w-full p-2 border rounded-md" placeholder="Selecione a data final">
         </div>
     </div>
-</div>
 
-<!-- Aba Frequência -->
-<div id="frequencia-tab" class="bg-white p-4 rounded-lg shadow-md hidden">
-    <h3 class="text-lg font-semibold mb-4">Média de Frequência Mensal</h3>
-    <canvas id="frequencia-chart" style="max-height: 300px;"></canvas>
-</div>
-
-<!-- Aba Movimentação -->
-<div id="movimentacao-tab" class="bg-white p-4 rounded-lg shadow-md hidden">
-    <h3 class="text-lg font-semibold mb-4">Movimentação</h3>
-    <div class="flex justify-end mb-4">
-        <a href="/reports_busca_ativa" class="bg-blue-600 text-white px-4 py-2 rounded-md hover:bg-blue-700 flex items-center">
-            <i data-lucide="search" class="h-4 w-4 mr-2"></i>
-            Busca Ativa
-        </a>
-    </div>
-    <div class="grid grid-cols-1 md:grid-cols-2 gap-6">
-        <div>
-            <h4 class="text-md font-semibold mb-2">Alunos Novos por Mês</h4>
-            <canvas id="alunos-novos-chart" style="max-height: 300px;"></canvas>
+    <!-- Cards de Resumo -->
+    <div class="grid grid-cols-1 md:grid-cols-4 gap-6 mb-6">
+        <div class="bg-white p-4 rounded-lg shadow-md cursor-pointer" onclick="showTab('distribuicao')">
+            <h3 class="text-sm font-medium text-gray-500 mb-2">Total de Alunos</h3>
+            <p id="total-alunos" class="text-2xl font-bold">0</p>
         </div>
-        <div>
-            <h4 class="text-md font-semibold mb-2">Trocas de Turma por Mês</h4>
-            <canvas id="trocas-turma-chart" style="max-height: 300px;"></canvas>
+        <div class="bg-white p-4 rounded-lg shadow-md cursor-pointer" onclick="showTab('frequencia')">
+            <h3 class="text-sm font-medium text-gray-500 mb-2">Média de Frequência</h3>
+            <p id="media-frequencia" class="text-2xl font-bold">0%</p>
         </div>
-        <div>
-            <h4 class="text-md font-semibold mb-2">Evasão por Mês</h4>
-            <canvas id="evasao-chart" style="max-height: 300px;"></canvas>
+        <div class="bg-white p-4 rounded-lg shadow-md cursor-pointer" onclick="showTab('movimentacao')">
+            <h3 class="text-sm font-medium text-gray-500 mb-2">Alunos Novos (2025)</h3>
+            <p id="alunos-novos" class="text-2xl font-bold">0</p>
         </div>
-        <div>
-            <h4 class="text-md font-semibold mb-2">Retorno por Mês</h4>
-            <canvas id="retorno-chart" style="max-height: 300px;"></canvas>
-        </div>
-        <div>
-            <h4 class="text-md font-semibold mb-2">Turmas com Maior Evasão</h4>
-            <canvas id="evasao-por-turma-chart" style="max-height: 300px;"></canvas>
-        </div>
-        <div>
-            <h4 class="text-md font-semibold mb-2">Turmas com Maior Retorno</h4>
-            <canvas id="retorno-por-turma-chart" style="max-height: 300px;"></canvas>
+        <div class="bg-white p-4 rounded-lg shadow-md cursor-pointer" onclick="showTab('movimentacao')">
+            <h3 class="text-sm font-medium text-gray-500 mb-2">Trocas de Turma</h3>
+            <p id="trocas-turma" class="text-2xl font-bold">0</p>
         </div>
     </div>
-</div>
 
-<!-- Aba Taxa de Ocupação -->
-<div id="taxa-tab" class="bg-white p-4 rounded-lg shadow-md hidden">
-    <h3 class="text-lg font-semibold mb-4">Taxa de Ocupação Geral</h3>
-    <p id="occupancy-rate" class="text-3xl font-bold mb-4">0%</p>
-    <p class="text-gray-500">de ocupação das turmas</p>
-    <p id="occupancy-details" class="text-gray-500">0 alunos matriculados de 0 vagas totais</p>
-</div>
-
-<!-- Aba Turmas Ativas -->
-<div id="ativas-tab" class="bg-white p-4 rounded-lg shadow-md hidden">
-    <h3 class="text-lg font-semibold mb-4">Turmas Ativas com Alunos Matriculados (<span id="current-period"></span>, <span id="current-day"></span>)</h3>
-    <p id="active-classes-count" class="text-gray-500 mb-4">0 turmas ativas</p>
-    <div id="active-classes" class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-x-4 gap-y-1"></div>
-</div>
-
-<!-- Listas de Alunos -->
-<div class="grid grid-cols-1 md:grid-cols-2 gap-6 mt-6">
-    <div class="bg-white p-4 rounded-lg shadow-md">
-        <h3 class="text-lg font-semibold mb-4">Alunos Matriculados</h3>
-        <div id="enrolled-students" class="space-y-4"></div>
-        <div id="enrolled-students-pagination" class="flex justify-center mt-4 space-x-2"></div>
-    </div>
-    <div class="bg-white p-4 rounded-lg shadow-md">
-        <h3 class="text-lg font-semibold mb-4">Alunos Disponíveis</h3>
-        <div class="relative mb-4">
-            <input
-                id="student-search-available"
-                type="text"
-                placeholder="Buscar alunos..."
-                class="w-full p-2 pl-10 border rounded-md"
-                oninput="filterAvailableStudents(1)"
-            >
-            <svg class="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-gray-400" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z"/>
-            </svg>
+    <!-- Abas -->
+    <div class="mb-6">
+        <div class="flex space-x-2 flex-wrap">
+            <button onclick="showTab('distribuicao')" class="bg-blue-600 text-white px-4 py-2 rounded-md hover:bg-blue-700">Distribuição</button>
+            <button onclick="showTab('frequencia')" class="bg-gray-200 text-gray-700 px-4 py-2 rounded-md hover:bg-gray-300">Frequência</button>
+            <button onclick="showTab('movimentacao')" class="bg-gray-200 text-gray-700 px-4 py-2 rounded-md hover:bg-gray-300">Movimentação</button>
+            <button onclick="showTab('taxa')" class="bg-gray-200 text-gray-700 px-4 py-2 rounded-md hover:bg-gray-300">Taxa de Ocupação Geral</button>
+            <button onclick="showTab('ativas')" class="bg-gray-200 text-gray-700 px-4 py-2 rounded-md hover:bg-gray-300">Turmas Ativas</button>
         </div>
-        <div id="available-students" class="space-y-4"></div>
-        <div id="available-students-pagination" class="flex justify-center mt-4 space-x-2"></div>
     </div>
-</div>
 
-<!-- Modal para Alunos Matriculados -->
-<div id="students-modal" class="fixed inset-0 bg-gray-600 bg-opacity-50 flex items-center justify-center hidden z-50">
-    <div class="bg-white rounded-lg shadow-xl w-full max-w-md p-6 max-h-[80vh] flex flex-col border border-blue-600">
-        <div class="flex justify-between items-center mb-4">
-            <h3 id="modal-title" class="text-lg font-semibold text-gray-900">Alunos Matriculados</h3>
-            <button onclick="closeModal()" class="text-gray-500 hover:text-gray-700">
-                <svg class="h-6 w-6" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12"/>
+    <!-- Aba Distribuição -->
+    <div id="distribuicao-tab" class="bg-white p-4 rounded-lg shadow-md">
+        <h3 class="text-lg font-semibold mb-4">Distribuição</h3>
+        <div class="grid grid-cols-1 md:grid-cols-2 gap-6">
+            <div>
+                <h4 class="text-md font-semibold mb-2">Alunos por Disciplina</h4>
+                <canvas id="alunos-por-disciplina-chart" style="max-height: 300px;"></canvas>
+            </div>
+            <div>
+                <h4 class="text-md font-semibold mb-2">Alunos por Período</h4>
+                <canvas id="alunos-por-periodo-chart" style="max-height: 300px;"></canvas>
+            </div>
+            <div class="md:col-span-2">
+                <h4 class="text-md font-semibold mb-2">Alunos por Faixa Etária</h4>
+                <canvas id="alunos-por-faixa-etaria-chart" style="max-height: 300px;"></canvas>
+            </div>
+        </div>
+    </div>
+
+    <!-- Aba Frequência -->
+    <div id="frequencia-tab" class="bg-white p-4 rounded-lg shadow-md hidden">
+        <h3 class="text-lg font-semibold mb-4">Média de Frequência Mensal</h3>
+        <canvas id="frequencia-chart" style="max-height: 300px;"></canvas>
+    </div>
+
+    <!-- Aba Movimentação -->
+    <div id="movimentacao-tab" class="bg-white p-4 rounded-lg shadow-md hidden">
+        <h3 class="text-lg font-semibold mb-4">Movimentação</h3>
+        <div class="flex justify-end mb-4">
+            <a href="/reports_busca_ativa" class="bg-blue-600 text-white px-4 py-2 rounded-md hover:bg-blue-700 flex items-center">
+                <i data-lucide="search" class="h-4 w-4 mr-2"></i>
+                Busca Ativa
+            </a>
+        </div>
+        <div class="grid grid-cols-1 md:grid-cols-2 gap-6">
+            <div>
+                <h4 class="text-md font-semibold mb-2">Alunos Novos por Mês</h4>
+                <canvas id="alunos-novos-chart" style="max-height: 300px;"></canvas>
+            </div>
+            <div>
+                <h4 class="text-md font-semibold mb-2">Trocas de Turma por Mês</h4>
+                <canvas id="trocas-turma-chart" style="max-height: 300px;"></canvas>
+            </div>
+            <div>
+                <h4 class="text-md font-semibold mb-2">Evasão por Mês</h4>
+                <canvas id="evasao-chart" style="max-height: 300px;"></canvas>
+            </div>
+            <div>
+                <h4 class="text-md font-semibold mb-2">Retorno por Mês</h4>
+                <canvas id="retorno-chart" style="max-height: 300px;"></canvas>
+            </div>
+            <div>
+                <h4 class="text-md font-semibold mb-2">Turmas com Maior Evasão</h4>
+                <canvas id="evasao-por-turma-chart" style="max-height: 300px;"></canvas>
+            </div>
+            <div>
+                <h4 class="text-md font-semibold mb-2">Turmas com Maior Retorno</h4>
+                <canvas id="retorno-por-turma-chart" style="max-height: 300px;"></canvas>
+            </div>
+        </div>
+    </div>
+
+    <!-- Aba Taxa de Ocupação -->
+    <div id="taxa-tab" class="bg-white p-4 rounded-lg shadow-md hidden">
+        <h3 class="text-lg font-semibold mb-4">Taxa de Ocupação Geral</h3>
+        <p id="occupancy-rate" class="text-3xl font-bold mb-4">0%</p>
+        <p class="text-gray-500">de ocupação das turmas</p>
+        <p id="occupancy-details" class="text-gray-500">0 alunos matriculados de 0 vagas totais</p>
+    </div>
+
+    <!-- Aba Turmas Ativas -->
+    <div id="ativas-tab" class="bg-white p-4 rounded-lg shadow-md hidden">
+        <h3 class="text-lg font-semibold mb-4">Turmas Ativas com Alunos Matriculados (<span id="current-period"></span>, <span id="current-day"></span>)</h3>
+        <p id="active-classes-count" class="text-gray-500 mb-4">0 turmas ativas</p>
+        <div id="active-classes" class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-x-4 gap-y-1"></div>
+    </div>
+
+    <!-- Listas de Alunos -->
+    <div class="grid grid-cols-1 md:grid-cols-2 gap-6 mt-6">
+        <div class="bg-white p-4 rounded-lg shadow-md">
+            <h3 class="text-lg font-semibold mb-4">Alunos Matriculados</h3>
+            <div id="enrolled-students" class="space-y-4"></div>
+            <div id="enrolled-students-pagination" class="flex justify-center mt-4 space-x-2"></div>
+        </div>
+        <div class="bg-white p-4 rounded-lg shadow-md">
+            <h3 class="text-lg font-semibold mb-4">Alunos Disponíveis</h3>
+            <div class="relative mb-4">
+                <input
+                    id="student-search-available"
+                    type="text"
+                    placeholder="Buscar alunos..."
+                    class="w-full p-2 pl-10 border rounded-md"
+                >
+                <svg class="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-gray-400" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z"/>
                 </svg>
-            </button>
+            </div>
+            <div id="available-students" class="space-y-4"></div>
+            <div id="available-students-pagination" class="flex justify-center mt-4 space-x-2"></div>
         </div>
-        <div id="modal-students" class="space-y-4 overflow-y-auto flex-1"></div>
+    </div>
+
+    <!-- Modal para Alunos Matriculados -->
+    <div id="students-modal" class="fixed inset-0 bg-gray-600 bg-opacity-50 flex items-center justify-center hidden z-50">
+        <div class="bg-white rounded-lg shadow-xl w-full max-w-md p-6 max-h-[80vh] flex flex-col border border-blue-600">
+            <div class="flex justify-between items-center mb-4">
+                <h3 id="modal-title" class="text-lg font-semibold text-gray-900">Alunos Matriculados</h3>
+                <button onclick="closeModal()" class="text-gray-500 hover:text-gray-700">
+                    <svg class="h-6 w-6" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12"/>
+                    </svg>
+                </button>
+            </div>
+            <div id="modal-students" class="space-y-4 overflow-y-auto flex-1"></div>
+        </div>
     </div>
 </div>
 {% endblock %}
@@ -198,10 +205,5 @@
             renderDistribuicaoCharts();
         }
     }
-
-    document.addEventListener('DOMContentLoaded', () => {
-        showTab('distribuicao');
-        filterAvailableStudents(1);
-    });
 </script>
 {% endblock %}

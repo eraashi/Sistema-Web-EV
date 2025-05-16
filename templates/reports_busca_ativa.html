@@ -8,25 +8,25 @@
 <div class="space-y-6">
     <!-- Filtros -->
     <div class="bg-white p-4 rounded-lg shadow-md">
-        <h2 class="text-lg font-semibold mb-4">Filtros</h2>
+        <h2 class="text-lg font-semibold text-gray-900 mb-4">Filtros</h2>
         <div class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
             <div>
                 <label class="block text-sm font-medium text-gray-700 mb-1">Polo</label>
-                <select id="filter-polo" class="w-full p-2 border rounded-md focus:outline-none focus:ring-2 focus:ring-[#1e40af]">
+                <select id="filter-polo" class="w-full p-2 border rounded-md focus:outline-none focus:ring-2 focus:ring-[#3B82F6]">
                     <option value="all">Todos os polos</option>
                 </select>
             </div>
             <div>
                 <label class="block text-sm font-medium text-gray-700 mb-1">Data Inicial</label>
-                <input id="filter-start-date" type="text" class="w-full p-2 border rounded-md focus:outline-none focus:ring-2 focus:ring-[#1e40af]" placeholder="Selecione a data inicial">
+                <input id="filter-start-date" type="text" class="w-full p-2 border rounded-md focus:outline-none focus:ring-2 focus:ring-[#3B82F6]" placeholder="Selecione a data inicial">
             </div>
             <div>
                 <label class="block text-sm font-medium text-gray-700 mb-1">Data Final</label>
-                <input id="filter-end-date" type="text" class="w-full p-2 border rounded-md focus:outline-none focus:ring-2 focus:ring-[#1e40af]" placeholder="Selecione a data final">
+                <input id="filter-end-date" type="text" class="w-full p-2 border rounded-md focus:outline-none focus:ring-2 focus:ring-[#3B82F6]" placeholder="Selecione a data final">
             </div>
             <div>
                 <label class="block text-sm font-medium text-gray-700 mb-1">Turma</label>
-                <select id="filter-turma" class="w-full p-2 border rounded-md focus:outline-none focus:ring-2 focus:ring-[#1e40af]">
+                <select id="filter-turma" class="w-full p-2 border rounded-md focus:outline-none focus:ring-2 focus:ring-[#3B82F6]">
                     <option value="all">Todas as turmas</option>
                 </select>
             </div>
@@ -35,7 +35,7 @@
 
     <!-- Métricas de Busca Ativa -->
     <div class="bg-white p-4 rounded-lg shadow-md">
-        <h2 class="text-lg font-semibold mb-4">Métricas de Busca Ativa</h2>
+        <h2 class="text-lg font-semibold text-gray-900 mb-4">Métricas de Busca Ativa</h2>
         <div id="busca-ativa-section" class="space-y-4">
             <!-- Cards de alunos serão adicionados dinamicamente aqui -->
         </div>
@@ -44,20 +44,20 @@
 
     <!-- Relatórios de Busca Ativa (Supervisor) -->
     <div class="bg-white p-4 rounded-lg shadow-md">
-        <h2 class="text-lg font-semibold mb-4">Relatórios de Busca Ativa (Supervisor)</h2>
+        <h2 class="text-lg font-semibold text-gray-900 mb-4">Relatórios de Busca Ativa (Supervisor)</h2>
         <div class="mb-4">
             <label class="block text-sm font-medium text-gray-700 mb-1">Filtrar por Funcionário</label>
-            <select id="filter-funcionario" class="w-full p-2 border rounded-md focus:outline-none focus:ring-2 focus:ring-[#1e40af]">
+            <select id="filter-funcionario" class="w-full p-2 border rounded-md focus:outline-none focus:ring-2 focus:ring-[#3B82F6]">
                 <option value="all">Todos os funcionários</option>
             </select>
         </div>
         <div class="grid grid-cols-1 md:grid-cols-2 gap-6">
             <div>
-                <h4 class="text-md font-semibold mb-2">Relatórios de Interações</h4>
+                <h4 class="text-md font-semibold text-gray-900 mb-2">Relatórios de Interações</h4>
                 <div id="relatorios-section" class="space-y-4"></div>
             </div>
             <div>
-                <h4 class="text-md font-semibold mb-2">Desempenho dos Funcionários</h4>
+                <h4 class="text-md font-semibold text-gray-900 mb-2">Desempenho dos Funcionários</h4>
                 <canvas id="desempenho-chart" style="max-height: 300px;"></canvas>
             </div>
         </div>
@@ -68,7 +68,7 @@
 <div id="contact-modal" class="modal">
     <div class="modal-content">
         <div class="modal-header">
-            <h2 id="modal-title" class="modal-title">Contato com Aluno</h2>
+            <h2 id="modal-title" class="modal-title text-gray-900">Contato com Aluno</h2>
         </div>
         <div class="modal-body">
             <div id="student-details" class="space-y-2 mb-4">
@@ -76,19 +76,19 @@
             </div>
             <div>
                 <label class="block text-sm font-medium text-gray-700 mb-1">Resultado da Abordagem (máx. 200 caracteres)</label>
-                <textarea id="resultado" class="w-full p-2 border rounded-md focus:outline-none focus:ring-2 focus:ring-[#1e40af]" maxlength="200"></textarea>
+                <textarea id="resultado" class="w-full p-2 border rounded-md focus:outline-none focus:ring-2 focus:ring-[#3B82F6]" maxlength="200"></textarea>
             </div>
             <div class="mt-4">
                 <label class="block text-sm font-medium text-gray-700 mb-1">Sucesso na Abordagem</label>
-                <select id="sucesso" class="w-full p-2 border rounded-md focus:outline-none focus:ring-2 focus:ring-[#1e40af]">
+                <select id="sucesso" class="w-full p-2 border rounded-md focus:outline-none focus:ring-2 focus:ring-[#3B82F6]">
                     <option value="true">Sim</option>
                     <option value="false">Não</option>
                 </select>
             </div>
         </div>
         <div class="modal-footer">
-            <button type="button" id="save-report" class="modal-button modal-button-save">Salvar</button>
-            <button type="button" id="close-modal" class="modal-button modal-button-cancel">Fechar</button>
+            <button type="button" id="save-report" class="modal-button modal-button-save bg-[#3B82F6] hover:bg-[#1E3A8A] text-white">Salvar</button>
+            <button type="button" id="close-modal" class="modal-button modal-button-cancel bg-gray-300 hover:bg-gray-400 text-gray-700">Fechar</button>
         </div>
     </div>
 </div>
@@ -115,7 +115,7 @@
 .modal-content {
     background-color: #fff;
     padding: 20px;
-    border: 1px solid #1e40af;
+    border: 1px solid #3B82F6;
     width: 90%;
     max-width: 600px;
     max-height: 90vh;
@@ -153,24 +153,6 @@
     border-radius: 4px;
     font-size: 1rem;
     cursor: pointer;
-}
-
-.modal-button-cancel {
-    background-color: #d1d5db;
-    color: #374151;
-}
-
-.modal-button-cancel:hover {
-    background-color: #9ca3af;
-}
-
-.modal-button-save {
-    background-color: #1e40af;
-    color: #fff;
-}
-
-.modal-button-save:hover {
-    background-color: #1d4ed8;
 }
 </style>
 {% endblock %}

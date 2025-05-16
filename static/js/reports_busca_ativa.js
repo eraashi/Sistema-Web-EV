@@ -157,22 +157,22 @@ function renderBuscaAtiva(data, turmas) {
 
     currentItems.forEach(item => {
         const card = document.createElement('div');
-        card.className = 'bg-gray-50 p-4 rounded-lg shadow-md transition-all duration-300 hover:bg-[#E6F4EA]';
+        card.className = 'bg-gray-50 p-4 rounded-lg shadow-md transition-all duration-300 hover:bg-blue-50';
         const status = [];
-        if (isEvadido(item.ultima_presenca)) status.push('<span class="text-red-500">Evadido >10 dias</span>');
+        if (isEvadido(item.ultima_presenca)) status.push('<span class="text-[#EF4444]">Evadido >10 dias</span>');
         if (item.percentual_faltas > 50) status.push('<span class="text-yellow-500">Muitas faltas</span>');
-        if (item.trocou_turma) status.push('<span class="text-blue-500">Trocou de turma</span>');
-        if (item.retornou) status.push('<span class="text-green-500">Retornou</span>');
+        if (item.trocou_turma) status.push('<span class="text-[#3B82F6]">Trocou de turma</span>');
+        if (item.retornou) status.push('<span class="text-[#10B981]">Retornou</span>');
 
         card.innerHTML = `
-            <h3 class="text-lg font-semibold">${item.nome_aluno}</h3>
+            <h3 class="text-lg font-semibold text-gray-900">${item.nome_aluno}</h3>
             <p class="text-sm text-gray-600">Turma: ${item.turma}</p>
             <p class="text-sm text-gray-600">Polo: ${item.polo}</p>
             <p class="text-sm text-gray-600">Última Presença: ${formatDateToBrazilian(item.ultima_presenca)}</p>
             <p class="text-sm text-gray-600">Faltas: ${item.percentual_faltas}%</p>
             <p class="text-sm text-gray-600">Status: ${status.join(', ')}</p>
             <div class="flex justify-end mt-4">
-                <button class="contact-btn bg-[#127a46] text-white px-3 py-1 rounded-md hover:bg-[#0f5f36] flex items-center">
+                <button class="contact-btn bg-[#3B82F6] text-white px-3 py-1 rounded-md hover:bg-[#1E3A8A] flex items-center">
                     <i data-lucide="phone" class="h-4 w-4 mr-1"></i>
                     Contatar
                 </button>
@@ -185,7 +185,7 @@ function renderBuscaAtiva(data, turmas) {
 
     if (totalItems > 0) {
         const prevButton = document.createElement('button');
-        prevButton.className = `px-4 py-2 rounded-md ${currentPage === 1 ? 'bg-gray-200 text-gray-500 cursor-not-allowed' : 'bg-[#127a46] text-white hover:bg-[#0f5f36]'}`;
+        prevButton.className = `px-4 py-2 rounded-md ${currentPage === 1 ? 'bg-gray-200 text-gray-500 cursor-not-allowed' : 'bg-[#3B82F6] text-white hover:bg-[#1E3A8A]'}`;
         prevButton.textContent = 'Anterior';
         prevButton.disabled = currentPage === 1;
         prevButton.addEventListener('click', () => {
@@ -196,7 +196,7 @@ function renderBuscaAtiva(data, turmas) {
         });
 
         const pageNumbers = document.createElement('div');
-        pageNumbers.className = 'focus:space-x-1';
+        pageNumbers.className = 'flex space-x-1';
         const maxVisiblePages = 5;
         let startPage = Math.max(1, currentPage - Math.floor(maxVisiblePages / 2));
         let endPage = Math.min(totalPages, startPage + maxVisiblePages - 1);
@@ -225,7 +225,7 @@ function renderBuscaAtiva(data, turmas) {
 
         for (let i = startPage; i <= endPage; i++) {
             const pageButton = document.createElement('button');
-            pageButton.className = `px-4 py-2 rounded-md ${i === currentPage ? 'bg-[#127a46] text-white' : 'bg-gray-200 text-gray-700 hover:bg-gray-300'}`;
+            pageButton.className = `px-4 py-2 rounded-md ${i === currentPage ? 'bg-[#3B82F6] text-white' : 'bg-gray-200 text-gray-700 hover:bg-gray-300'}`;
             pageButton.textContent = i;
             pageButton.addEventListener('click', () => {
                 currentPage = i;
@@ -253,7 +253,7 @@ function renderBuscaAtiva(data, turmas) {
         }
 
         const nextButton = document.createElement('button');
-        nextButton.className = `px-4 py-2 rounded-md ${currentPage === totalPages ? 'bg-gray-200 text-gray-500 cursor-not-allowed' : 'bg-[#127a46] text-white hover:bg-[#0f5f36]'}`;
+        nextButton.className = `px-4 py-2 rounded-md ${currentPage === totalPages ? 'bg-gray-200 text-gray-500 cursor-not-allowed' : 'bg-[#3B82F6] text-white hover:bg-[#1E3A8A]'}`;
         nextButton.textContent = 'Próximo';
         nextButton.disabled = currentPage === totalPages;
         nextButton.addEventListener('click', () => {
@@ -282,7 +282,7 @@ function renderRelatorios(relatorios) {
             <p class="text-sm text-gray-600"><strong>Funcionário:</strong> ${r.funcionario_nome}</p>
             <p class="text-sm text-gray-600"><strong>Data:</strong> ${formatDateToBrazilian(r.data)}</p>
             <p class="text-sm text-gray-600"><strong>Resultado:</strong> ${r.resultado}</p>
-            <p class="text-sm text-gray-600"><strong>Sucesso:</strong> ${r.sucesso ? '<span class="text-green-500">Sim</span>' : '<span class="text-red-500">Não</span>'}</p>
+            <p class="text-sm text-gray-600"><strong>Sucesso:</strong> ${r.sucesso ? '<span class="text-[#10B981]">Sim</span>' : '<span class="text-[#EF4444]">Não</span>'}</p>
         `;
         relatoriosSection.appendChild(card);
     });
@@ -298,12 +298,12 @@ function renderDesempenhoChart(funcionarios) {
                 {
                     label: 'Retornos',
                     data: funcionarios.map(f => f.retornos),
-                    backgroundColor: '#a4de6c'
+                    backgroundColor: '#3B82F6' // Azul claro do Escola Viva
                 },
                 {
                     label: 'Tentativas',
                     data: funcionarios.map(f => f.tentativas),
-                    backgroundColor: '#8884d8'
+                    backgroundColor: '#1E3A8A' // Azul escuro do Escola Viva
                 }
             ]
         },

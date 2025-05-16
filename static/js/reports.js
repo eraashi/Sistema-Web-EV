@@ -3,7 +3,7 @@ let classes = [];
 let enrollments = [];
 let activeClasses = [];
 let polos = [];
-let studentsWithoutEnrollments = []; // Nova variável global para alunos sem matrículas
+let studentsWithoutEnrollments = [];
 let poloSelecionado = "all";
 let periodoInicio = new Date(new Date().setDate(new Date().getDate() - 30));
 let periodoFim = new Date();
@@ -122,6 +122,10 @@ function debounce(func, wait) {
 
 async function fetchData() {
     try {
+        // Mostrar overlay de carregamento
+        const overlay = document.getElementById('loading-overlay');
+        overlay.classList.remove('hidden');
+
         const responses = await Promise.all([
             fetch('/api/alunos', { credentials: 'include' }),
             fetch('/api/turmas', { credentials: 'include' }),
@@ -410,7 +414,7 @@ function renderDistribuicaoCharts() {
         alunosFaixaEtariaChart.destroy();
     }
 
-    const alunosDisciplinaCtx = document.getElementById('alunos-por-disciplina-chart').getContext('2d');
+    const alunosDisciplinaCtx= document.getElementById('alunos-por-disciplina-chart').getContext('2d');
     alunosDisciplinaChart = new Chart(alunosDisciplinaCtx, {
         type: 'bar',
         data: {
@@ -752,8 +756,8 @@ function renderReports(currentPeriod, currentDay) {
     const estatisticasGerais = {
         totalAlunos: students.length,
         mediaFrequencia: 92.5,
-        alunosNovos: students.filter(s => new Date(s.created_at).getFullYear() === 2025).length,
-        trocasTurma: 35
+        alunosNovos: alunosNovosData.reduce((sum, d) => sum + d.alunos, 0), // Soma dos alunos novos
+        trocasTurma: trocasTurmaData.reduce((sum, d) => sum + d.trocas, 0) // Soma das trocas de turma
     };
     document.getElementById('total-alunos').textContent = formatarNumero(estatisticasGerais.totalAlunos);
     document.getElementById('media-frequencia').textContent = `${estatisticasGerais.mediaFrequencia}%`;
@@ -812,6 +816,13 @@ function renderReports(currentPeriod, currentDay) {
     lucide.createIcons();
 
     renderDistribuicaoCharts();
+
+    // Esconder overlay e reativar interações após renderização inicial
+    filterAvailableStudents(1);
+    const overlay = document.getElementById('loading-overlay');
+    const mainContent = document.getElementById('main-content');
+    overlay.classList.add('hidden');
+    mainContent.classList.remove('pointer-events-none');
 }
 
 const style = document.createElement('style');
