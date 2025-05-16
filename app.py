@@ -174,6 +174,10 @@ def logs():
     print(f"Usuário autenticado em /logs: {user['id']}")
     return render_template('logs.html', user=user)
 
+@app.route('/reports_busca_ativa')
+def reports_busca_ativa():
+    return render_template('reports_busca_ativa.html')
+
 @app.route('/login', methods=['GET', 'POST'])
 def login():
     if request.method == 'POST':
@@ -1720,6 +1724,28 @@ def get_disciplinas():
     except Exception as e:
         print(f"Erro em get_disciplinas: {str(e)}")
         return jsonify({'error': str(e)}), 500
+    
+@app.route('/api/busca_ativa', methods=['GET', 'POST'])
+def busca_ativa():
+    user = get_current_user()
+    if not user:
+        return jsonify({'error': 'Unauthorized'}), 401
+    try:
+        if request.method == 'GET':
+            response = supabase.table('busca_ativa').select('*').execute()
+            return jsonify(response.data)
+        elif request.method == 'POST':
+            data = request.json
+            required_fields = ['id_aluno', 'funcionario_id', 'resultado', 'sucesso']
+            if not all(field in data for field in required_fields):
+                return jsonify({'error': 'Campos obrigatórios ausentes'}), 400
+            data['data'] = datetime.now().strftime('%Y-%m-%d')
+            response = supabase.table('busca_ativa').insert(data).execute()
+            if not response.data:
+                return jsonify({'error': 'Erro ao criar relatório'}), 500
+            return jsonify({'message': 'Relatório criado com sucesso'})
+    except Exception as e:
+        return jsonify({'error': str(e)}), 500    
 
 if __name__ == '__main__':
     app.run(host='0.0.0.0', port=5000, debug=True)

@@ -48,7 +48,7 @@
                     Estatísticas
                 </a>
                 <div class="relative">
-                    <a class="flex items-center p-4 hover:bg-blue-700 cursor-pointer {% if request.path == '/reports_presences' or request.path == '/reports_occurrences' %}bg-blue-700{% endif %}">
+                    <a class="flex items-center p-4 hover:bg-blue-700 cursor-pointer {% if request.path in ['/reports_presences', '/reports_occurrences', '/reports_busca_ativa'] %}bg-blue-700{% endif %}">
                         <svg class="h-5 w-5 mr-2" fill="none" viewBox="0 0 24 24" stroke="currentColor">
                             <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 5H7a2 2 0 00-2 2v12a2 2 0 002 2h10a2 2 0 002-2V7a2 2 0 00-2-2h-2M9 5a2 2 0 002 2h2a2 2 0 002-2M9 5a2 2 0 012-2h2a2 2 0 012 2"/>
                         </svg>
@@ -61,10 +61,13 @@
                         <a href="/reports_occurrences" class="flex items-center p-4 text-white hover:bg-blue-700 {% if request.path == '/reports_occurrences' %}bg-blue-700{% endif %}">
                             Ocorrências
                         </a>
+                        <a href="/reports_busca_ativa" class="flex items-center p-4 text-white hover:bg-blue-700 {% if request.path == '/reports_busca_ativa' %}bg-blue-700{% endif %}">
+                            Busca Ativa
+                        </a>
                     </div>
                 </div>
             </nav>
-            <div class="relative mb-2">
+            <div class="relative mb-0">
                 <a class="flex items-center p-4 hover:bg-blue-700 cursor-pointer {% if request.path == '/funcionarios' %}bg-blue-700{% endif %}">
                     <i data-lucide="settings" class="h-5 w-5 mr-2"></i>
                     Configurações
@@ -89,7 +92,7 @@
             </div>
         </div>
         <!-- Main Content -->
-        <div class="container flex-1 flex flex-col">
+        <div class="container flex-1 flex flex-col ml-64">
             <header class="bg-white shadow-sm p-4 flex justify-between items-center">
                 <h1 class="text-xl font-semibold">{% block header %}{% endblock %}</h1>
                 <div class="flex items-center space-x-2">
@@ -103,66 +106,84 @@
         </div>
     </div>
     <!-- Custom Toast Container -->
-    <div id="custom-toast-container" class="fixed bottom-4 right-4 z-[10000] flex flex-col space-y-2">
-        <!-- Toasts will be dinamically added aqui -->
-    </div>
+    <div id="custom-toast-container" class="fixed bottom-4 right-4 z-[10000] flex flex-col space-y-2"></div>
 
     <style>
-    /* Estilo do Dropdown no Navbar */
     .dropdown-menu {
         display: none;
         position: absolute;
-        background-color: #1e40af; /* Mesmo fundo azul escuro do navbar */
-        width: 100%; /* Mesma largura do navbar */
-        left: 0; /* Alinha à esquerda do botão pai */
+        background-color: #1e40af;
+        width: 100%;
+        left: 0;
         z-index: 1;
     }
 
     .dropdown-menu a {
         display: flex;
         align-items: center;
-        padding: 1rem; /* Mesmo padding dos outros botões */
-        color: #ffffff; /* Texto branco */
+        padding: 1rem;
+        color: #ffffff;
         text-decoration: none;
-        font-size: 1rem; /* Mesmo tamanho de fonte */
+        font-size: 1rem;
         transition: background-color 0.2s ease;
     }
 
     .dropdown-menu a:hover {
-        background-color: #1d4ed8; /* Mesmo hover dos outros botões */
+        background-color: #1d4ed8;
     }
 
     .dropdown-menu.show {
         display: block;
     }
 
-    /* Estilo do Dropdown para Configurações (surge para cima) */
     .dropdown-menu-up {
         display: none;
         position: absolute;
-        background-color: #1e40af; /* Mesmo fundo azul escuro do navbar */
-        width: 100%; /* Mesma largura do navbar */
-        left: 0; /* Alinha à esquerda do botão pai */
-        bottom: 100%; /* Surge acima do botão */
+        background-color: #1e40af;
+        width: 100%;
+        left: 0;
+        bottom: 100%;
         z-index: 1;
     }
 
     .dropdown-menu-up a {
         display: flex;
         align-items: center;
-        padding: 1rem; /* Mesmo padding dos outros botões */
-        color: #ffffff; /* Texto branco */
+        padding: 1rem;
+        color: #ffffff;
         text-decoration: none;
-        font-size: 1rem; /* Mesmo tamanho de fonte */
+        font-size: 1rem;
         transition: background-color 0.2s ease;
     }
 
     .dropdown-menu-up a:hover {
-        background-color: #1d4ed8; /* Mesmo hover dos outros botões */
+        background-color: #1d4ed8;
     }
 
     .dropdown-menu-up.show {
         display: block;
+    }
+
+    /* Ensure content respects viewport on smaller screens */
+    @media (max-width: 768px) {
+        .sidebar {
+            width: 100%;
+            position: relative;
+            height: auto;
+        }
+
+        .container {
+            margin-left: 0;
+            width: 100%;
+        }
+
+        header {
+            width: 100%;
+        }
+
+        main {
+            width: 100%;
+        }
     }
     </style>
 
@@ -170,7 +191,7 @@
         function logout() {
             fetch('/logout', { 
                 method: 'POST',
-                credentials: 'include'  // Enviar cookies de sessão
+                credentials: 'include'
             })
                 .then(() => window.location.href = '/login')
                 .catch(error => alert('Erro: ' + error.message));
