@@ -2,25 +2,121 @@
     let classes = [];
     let disciplinas = [];
 
-    // Função para buscar disciplinas
-    async function fetchDisciplinas() {
-        try {
-            const response = await fetch('/api/disciplinas', { credentials: 'include' });
-            if (!response.ok) {
-                const errorText = await response.text();
-                throw new Error(`Erro ao carregar disciplinas: ${errorText}`);
+    const retryFetch = async (url, options, retries = 2, delay = 500) => {
+        const cacheKey = `cache_${url}`;
+        const cached = localStorage.getItem(cacheKey);
+        if (cached) {
+            try {
+                const { data, timestamp } = JSON.parse(cached);
+                if (Date.now() - timestamp < 10000 && data && Array.isArray(data)) {
+                    return data;
+                } else {
+                    localStorage.removeItem(cacheKey);
+                }
+            } catch (e) {
+                localStorage.removeItem(cacheKey);
             }
-            disciplinas = await response.json();
-            console.log('Disciplinas carregadas:', disciplinas);
+        }
+
+        for (let i = 0; i < retries; i++) {
+            try {
+                const response = await fetch(url, options);
+                if (!response.ok) {
+                    throw new Error(`Erro HTTP! Status: ${response.status}`);
+                }
+                const data = await response.json();
+                try {
+                    localStorage.setItem(cacheKey, JSON.stringify({ data, timestamp: Date.now() }));
+                } catch (e) {}
+                return data;
+            } catch (error) {
+                if (i < retries - 1) {
+                    await new Promise(resolve => setTimeout(resolve, delay));
+                } else {
+                    throw error;
+                }
+            }
+        }
+    };
+
+    async function fetchData() {
+        const overlay = document.createElement('div');
+        overlay.id = 'loading-overlay';
+        overlay.className = 'fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50';
+        overlay.innerHTML = '<div class="w-12 h-12 border-4 border-blue-600 border-t-transparent rounded-full animate-spin"></div>';
+        document.body.appendChild(overlay);
+
+        const mainContent = document.querySelector('.mb-6');
+        if (mainContent) {
+            mainContent.classList.add('pointer-events-none');
+        }
+
+        try {
+            classes = [];
+            disciplinas = [];
+
+            let isRendered = false;
+
+            const cacheKeyDashboard = 'cache_/api/dashboard_data';
+            const cachedDashboard = localStorage.getItem(cacheKeyDashboard);
+            if (cachedDashboard) {
+                try {
+                    const { data, timestamp } = JSON.parse(cachedDashboard);
+                    if (Date.now() - timestamp < 10000 && data && Array.isArray(data.turmas) && data.turmas.length > 0) {
+                        classes = data.turmas;
+                        isRendered = true;
+                        renderClasses();
+                    } else {
+                        localStorage.removeItem(cacheKeyDashboard);
+                    }
+                } catch (e) {
+                    localStorage.removeItem(cacheKeyDashboard);
+                }
+            }
+
+            const cacheKeyDisciplinas = 'cache_/api/disciplinas';
+            const cachedDisciplinas = localStorage.getItem(cacheKeyDisciplinas);
+            if (cachedDisciplinas) {
+                try {
+                    const { data, timestamp } = JSON.parse(cachedDisciplinas);
+                    if (Date.now() - timestamp < 10000 && data && Array.isArray(data)) {
+                        disciplinas = data;
+                        populateDisciplinaSelect();
+                    } else {
+                        localStorage.removeItem(cacheKeyDisciplinas);
+                    }
+                } catch (e) {
+                    localStorage.removeItem(cacheKeyDisciplinas);
+                }
+            }
+
+            const [dashboardData, disciplinasData] = await Promise.all([
+                retryFetch('/api/dashboard_data', { credentials: 'include' }),
+                retryFetch('/api/disciplinas', { credentials: 'include' })
+            ]);
+
+            classes = Array.isArray(dashboardData.turmas) ? dashboardData.turmas : [];
+            disciplinas = Array.isArray(disciplinasData) ? disciplinasData : [];
+
+            if (!isRendered || classes.length > 0) {
+                renderClasses();
+            }
             populateDisciplinaSelect();
+
+            if (overlay && mainContent) {
+                overlay.remove();
+                mainContent.classList.remove('pointer-events-none');
+            }
         } catch (error) {
-            console.error('Erro em fetchDisciplinas:', error.message);
-            alert('Erro: ' + error.message);
-            window.location.href = '/login';
+            showToast('Erro ao carregar dados: ' + error.message, 'error', 'alert-circle', 3000);
+            renderClasses();
+            if (overlay && mainContent) {
+                overlay.remove();
+                mainContent.classList.remove('pointer-events-none');
+            }
         }
     }
 
-    // Função para preencher o select de disciplinas
     function populateDisciplinaSelect() {
         const select = document.getElementById('create-disciplina-id');
         select.innerHTML = '<option value="" disabled selected hidden>Escolha uma disciplina...</option>';
@@ -32,35 +128,8 @@
         });
     }
 
-    async function fetchClasses() {
-        try {
-            const response = await fetch('/api/turmas', { credentials: 'include' });
-            if (!response.ok) {
-                const errorText = await response.text();
-                throw new Error(`Erro ao carregar turmas: ${errorText}`);
-            }
-            classes = await response.json();
-            console.log('Turmas carregadas:', classes);
-            console.log('Tipos de turmas disponíveis:', [...new Set(classes.map(cls => cls.type))]);
-            const motorClasses = classes.filter(cls => cls.type === 'motora');
-            console.log('Número de turmas motoras:', motorClasses.length);
-            console.log('Turmas motoras:', motorClasses);
-            renderClasses();
-        } catch (error) {
-            console.error('Erro em fetchClasses:', error.message);
-            alert('Erro: ' + error.message);
-            window.location.href = '/login';
-        }
-    }
-
     function filterClasses(type) {
-        console.log(`Filtrando turmas do tipo: ${type}`);
-        const filtered = type ? classes.filter(cls => {
-            const matchesType = cls.type === type;
-            console.log(`Turma ${cls.name}: type=${cls.type}, matches=${matchesType}`);
-            return matchesType;
-        }) : classes;
-        console.log('Turmas filtradas:', filtered);
+        const filtered = type ? classes.filter(cls => cls.type === type) : classes;
         renderClasses(filtered);
 
         document.querySelectorAll('button').forEach(btn => {
@@ -87,7 +156,6 @@
         tbody.innerHTML = '';
 
         if (filteredClasses.length === 0) {
-            // Ajustar o colspan com base no cargo do usuário
             const colspan = currentUserRole === 'admin' || currentUserRole === 'secretaria' || currentUserRole === 'coordenador' ? 8 : 7;
             tbody.innerHTML = `<tr><td colspan="${colspan}" class="px-6 py-4 text-center text-gray-500">Nenhuma turma encontrada.</td></tr>`;
         } else {
@@ -98,9 +166,7 @@
                 const typeText = cls.type === 'cognitiva' ? 'Cognitiva' : 'Motora';
                 const firstName = extractClassName(cls.name);
                 const capitalizedName = capitalizeFirstLetter(firstName);
-                console.log(`Turma ${cls.name}: type=${cls.type}, typeClass=${typeClass}`);
                 const typeStyle = cls.type === 'motora' ? 'style="background-color: #f3e8ff"' : '';
-                // Renderizar os botões "Editar" e "Excluir" apenas para admin, secretaria e coordenador
                 const actionButtons = (currentUserRole === 'admin' || currentUserRole === 'secretaria' || currentUserRole === 'coordenador')
                     ? `<td class="px-6 py-4">
                            <button class="edit-button" data-index="${index}">
@@ -142,24 +208,16 @@
                 `;
             });
 
-            // Adicionar event listeners para os botões "Editar"
-            const editButtons = document.querySelectorAll('.edit-button');
-            console.log('Botões "Editar" encontrados:', editButtons.length);
-            editButtons.forEach(button => {
+            document.querySelectorAll('.edit-button').forEach(button => {
                 button.addEventListener('click', () => {
                     const index = button.getAttribute('data-index');
-                    console.log('Botão "Editar" clicado, índice:', index);
                     openEditModal(index);
                 });
             });
 
-            // Adicionar event listeners para os botões "Excluir"
-            const deleteButtons = document.querySelectorAll('.delete-button');
-            console.log('Botões "Excluir" encontrados:', deleteButtons.length);
-            deleteButtons.forEach(button => {
+            document.querySelectorAll('.delete-button').forEach(button => {
                 button.addEventListener('click', () => {
                     const classId = button.getAttribute('data-id');
-                    console.log('Botão "Excluir" clicado, ID da turma:', classId);
                     deleteClass(classId);
                 });
             });
@@ -185,7 +243,6 @@
 
     function formatGrades(grades) {
         if (!grades) {
-            console.warn('grades está vazio ou indefinido:', grades);
             return 'Não especificado';
         }
 
@@ -195,77 +252,63 @@
         } else if (typeof grades === 'string') {
             gradesString = grades;
         } else {
-            console.warn('grades não é uma string nem um array:', grades);
             return 'Não especificado';
         }
 
         try {
             return gradesString.split(',').map(g => `${g.trim()}º`).join(' e ');
         } catch (error) {
-            console.error('Erro ao formatar grades:', error, 'grades:', grades);
             return 'Não especificado';
         }
     }
 
     function openEditModal(index) {
-        console.log('openEditModal chamado com index:', index);
         const cls = classes[index];
-        console.log('Dados da turma:', cls);
         if (!cls) {
-            console.error('Turma não encontrada no índice:', index);
             return;
         }
 
         const modal = document.getElementById('edit-class-modal');
         if (!modal) {
-            console.error('Modal element not found');
             return;
         }
-        console.log('Modal encontrado, alterando display para block');
         modal.style.display = 'block';
 
-        // Preencher o formulário com os dados da turma
         document.getElementById('edit-class-id').value = cls.id || '';
         document.getElementById('edit-name').value = cls.name || '';
         document.getElementById('edit-polo-name').value = cls.polo_name || userPoloName;
         document.getElementById('edit-type').value = cls.type || 'cognitiva';
 
-        // Preencher o par de etapas com o valor exato da turma
         const gradesSelect = document.getElementById('edit-grades');
-        const gradesValue = JSON.stringify(cls.grades); // Ex.: ["4", "5"]
+        const gradesValue = JSON.stringify(cls.grades);
         if (gradesSelect.querySelector(`option[value='${gradesValue}']`)) {
             gradesSelect.value = gradesValue;
         } else {
-            gradesSelect.value = '["4", "5"]'; // Valor padrão se não encontrado
+            gradesSelect.value = '["4", "5"]';
         }
 
-        // Preencher o dia da semana com o valor exato da turma
         const daySelect = document.getElementById('edit-day');
         if (cls.day && daySelect.querySelector(`option[value="${cls.day}"]`)) {
             daySelect.value = cls.day;
         } else {
-            daySelect.value = 'seg'; // Valor padrão se não encontrado
+            daySelect.value = 'seg';
         }
 
-        // Preencher o período com o valor exato da turma
         const periodSelect = document.getElementById('edit-period');
         if (cls.period && periodSelect.querySelector(`option[value="${cls.period.toLowerCase()}"]`)) {
             periodSelect.value = cls.period.toLowerCase();
         } else {
-            periodSelect.value = 'manha'; // Valor padrão se não encontrado
+            periodSelect.value = 'manha';
         }
 
-        // Preencher a capacidade com o valor exato da turma
         document.getElementById('edit-capacity').value = cls.capacity || 0;
     }
 
     function closeEditModal() {
         const modal = document.getElementById('edit-class-modal');
         if (!modal) {
-            console.error('Modal element not found');
             return;
         }
-        console.log('Fechando modal de edição');
         modal.style.display = 'none';
     }
 
@@ -274,72 +317,45 @@
         const form = document.getElementById('edit-class-form');
         const formData = new FormData(form);
         const classData = Object.fromEntries(formData);
-        // Parsear o valor de grades (que é uma string JSON) para um array
-        classData.grades = JSON.parse(classData.grades); // Ex.: ["4", "5"]
-        console.log('Dados enviados para atualização:', classData);
-        console.log('ID da turma:', classData.id);
-        console.log('URL da requisição:', `/api/turmas/${classData.id}`);
+        classData.grades = JSON.parse(classData.grades);
 
         try {
-            // Atualizar os dados da turma
-            const updateResponse = await fetch(`/api/turmas/${classData.id}`, {
+            const updateResponse = await retryFetch(`/api/turmas/${classData.id}`, {
                 method: 'PATCH',
                 headers: { 'Content-Type': 'application/json' },
                 body: JSON.stringify(classData),
                 credentials: 'include'
             });
-            if (!updateResponse.ok) {
-                const errorText = await updateResponse.text();
-                throw new Error(`Erro ao atualizar turma: ${errorText}`);
-            }
-
-            // Exibir toast de confirmação
             showToast('Dados da turma salvos com sucesso!', 'success', 'check-circle', 3000);
 
-            // Desmatricular todos os alunos da turma
-            const unenrollResponse = await fetch(`/api/turmas/${classData.id}/unenroll`, {
+            const unenrollResponse = await retryFetch(`/api/turmas/${classData.id}/unenroll`, {
                 method: 'DELETE',
                 headers: { 'Content-Type': 'application/json' },
                 credentials: 'include'
             });
-            if (!unenrollResponse.ok) {
-                const errorText = await unenrollResponse.text();
-                throw new Error(`Erro ao desmatricular alunos: ${errorText}`);
-            }
-
-            // Exibir toast de alerta
             showToast('Alunos desmatriculados com sucesso! É necessário matriculá-los novamente.', 'warning', 'alert-circle', 5000);
 
-            // Fechar o modal e recarregar as turmas
             closeEditModal();
-            fetchClasses();
+            fetchData();
         } catch (error) {
-            console.error('Erro ao salvar alterações:', error.message);
             showToast('Erro: ' + error.message, 'error', 'alert-circle', 3000);
         }
     }
 
     async function deleteClass(classId) {
-        console.log('Iniciando exclusão da turma com ID:', classId);
         if (!confirm('Tem certeza que deseja excluir esta turma? Todos os alunos matriculados serão desmatriculados.')) {
-            console.log('Exclusão cancelada pelo usuário');
             return;
         }
 
         try {
-            const response = await fetch(`/api/turmas/${classId}`, {
+            const response = await retryFetch(`/api/turmas/${classId}`, {
                 method: 'DELETE',
                 headers: { 'Content-Type': 'application/json' },
                 credentials: 'include'
             });
-            if (!response.ok) {
-                const errorText = await response.text();
-                throw new Error(`Erro ao excluir turma: ${errorText}`);
-            }
             showToast('Turma excluída com sucesso!', 'success', 'check-circle', 3000);
-            fetchClasses(); // Recarregar a lista de turmas
+            fetchData();
         } catch (error) {
-            console.error('Erro ao excluir turma:', error.message);
             showToast('Erro: ' + error.message, 'error', 'alert-circle', 3000);
         }
     }
@@ -347,19 +363,15 @@
     function openCreateModal() {
         const modal = document.getElementById('create-class-modal');
         if (!modal) {
-            console.error('Modal de criação not found');
             return;
         }
-        console.log('Abrindo modal de criação');
         modal.style.display = 'block';
 
-        // Limpar o formulário e os tooltips
         document.getElementById('create-class-form').reset();
         document.querySelectorAll('.tooltip').forEach(tooltip => {
             tooltip.style.display = 'none';
         });
 
-        // Inicializar o ícone de tipo com base na primeira disciplina
         updateTypeIcon(disciplinas.length > 0 ? disciplinas[0].tipo : 'cognitiva');
         lucide.createIcons();
     }
@@ -367,10 +379,8 @@
     function closeCreateModal() {
         const modal = document.getElementById('create-class-modal');
         if (!modal) {
-            console.error('Modal de criação not found');
             return;
         }
-        console.log('Fechando modal de criação');
         modal.style.display = 'none';
     }
 
@@ -378,41 +388,32 @@
         const typeIcon = document.getElementById('type-icon');
         if (!typeIcon) return;
 
-        // Remover o ícone existente
         typeIcon.removeAttribute('data-lucide');
         typeIcon.className = 'h-5 w-5 mr-2';
 
-        // Definir o novo ícone
         typeIcon.setAttribute('data-lucide', type === 'cognitiva' ? 'brain' : 'fast-forward');
         lucide.createIcons();
     }
 
     function showTooltip(elementId, message) {
-        console.log(`Exibindo tooltip para ${elementId}: ${message}`);
         const tooltip = document.getElementById(`tooltip-${elementId}`);
         if (tooltip) {
             tooltip.textContent = message;
             tooltip.style.display = 'block';
-        } else {
-            console.error(`Tooltip element tooltip-${elementId} not found`);
         }
     }
 
     async function createClass(event) {
         event.preventDefault();
-        console.log('Evento de submissão disparado para createClass');
 
         const form = document.getElementById('create-class-form');
         if (!form) {
-            console.error('Formulário create-class-form não encontrado');
             return;
         }
 
         const formData = new FormData(form);
         const classData = Object.fromEntries(formData);
-        console.log('Dados do formulário:', classData);
 
-        // Validação dos campos
         let hasError = false;
         const fields = [
             { id: 'name', message: 'Por favor, insira o nome da turma' },
@@ -426,7 +427,6 @@
 
         fields.forEach(field => {
             const value = classData[field.id];
-            console.log(`Validando campo ${field.id}: Valor = "${value}"`);
             if (!value || value.trim() === '') {
                 showTooltip(field.id, field.message);
                 hasError = true;
@@ -434,48 +434,27 @@
         });
 
         if (hasError) {
-            console.log('Validação falhou: Campos obrigatórios não preenchidos');
             return;
         }
 
-        console.log('Validação bem-sucedida, prosseguindo com a criação da turma');
-
-        // Parsear o valor de grades (que é uma string JSON) para um array
         try {
             classData.grades = JSON.parse(classData.grades);
-            console.log('Dados após parse do grades:', classData);
         } catch (error) {
-            console.error('Erro ao parsear grades:', error);
             showTooltip('grades', 'Erro ao processar o ano escolar');
             return;
         }
 
         try {
-            console.log('Enviando requisição para criar a turma...');
-            const createResponse = await fetch('/api/turmas', {
+            const createResponse = await retryFetch('/api/turmas', {
                 method: 'POST',
                 headers: { 'Content-Type': 'application/json' },
                 body: JSON.stringify(classData),
                 credentials: 'include'
             });
-
-            if (!createResponse.ok) {
-                const errorText = await createResponse.text();
-                console.error('Erro na resposta do servidor:', errorText);
-                throw new Error(`Erro ao criar turma: ${errorText}`);
-            }
-
-            const responseData = await createResponse.json();
-            console.log('Turma criada com sucesso:', responseData);
-
-            // Exibir toast de confirmação
             showToast('Turma criada com sucesso!', 'success', 'check-circle', 3000);
-
-            // Fechar o modal e recarregar as turmas
             closeCreateModal();
-            fetchClasses();
+            fetchData();
         } catch (error) {
-            console.error('Erro ao criar turma:', error.message);
             showToast('Erro: ' + error.message, 'error', 'alert-circle', 3000);
         }
     }
@@ -483,7 +462,6 @@
     function showToast(message, type, icon, duration = 3000) {
         const toastContainer = document.getElementById('custom-toast-container');
         if (!toastContainer) {
-            console.error('Toast container not found');
             return;
         }
 
@@ -511,93 +489,55 @@
     }
 
     document.addEventListener('DOMContentLoaded', () => {
-        // Verificar se o elemento do modal de edição existe no DOM
         const editModal = document.getElementById('edit-class-modal');
-        if (!editModal) {
-            console.error('Elemento do modal (edit-class-modal) não encontrado no DOM');
-        } else {
-            console.log('Elemento do modal (edit-class-modal) encontrado no DOM');
-            // Adicionar evento para fechar o modal ao clicar fora
+        if (editModal) {
             editModal.addEventListener('click', (event) => {
                 if (event.target === editModal) {
-                    console.log('Clique fora do modal de edição detectado');
                     closeEditModal();
                 }
             });
         }
 
-        // Verificar se o elemento do modal de criação existe no DOM
         const createModal = document.getElementById('create-class-modal');
-        if (!createModal) {
-            console.error('Elemento do modal (create-class-modal) não encontrado no DOM');
-        } else {
-            console.log('Elemento do modal (create-class-modal) encontrado no DOM');
-            // Adicionar evento para fechar o modal ao clicar fora
+        if (createModal) {
             createModal.addEventListener('click', (event) => {
                 if (event.target === createModal) {
-                    console.log('Clique fora do modal de criação detectado');
                     closeCreateModal();
                 }
             });
         }
 
-        // Verificar se o botão "Cancelar" do modal de edição existe no DOM e adicionar event listener
         const cancelEditButton = document.getElementById('cancel-edit-class');
-        if (!cancelEditButton) {
-            console.error('Botão "Cancelar" (cancel-edit-class) não encontrado no DOM');
-        } else {
-            console.log('Botão "Cancelar" (cancel-edit-class) encontrado no DOM');
-            cancelEditButton.addEventListener('click', () => {
-                console.log('Botão "Cancelar" clicado');
-                closeEditModal();
-            });
+        if (cancelEditButton) {
+            cancelEditButton.addEventListener('click', closeEditModal);
         }
 
-        // Verificar se o botão "Cancelar" do modal de criação existe no DOM e adicionar event listener
         const cancelCreateButton = document.getElementById('cancel-create-class');
-        if (!cancelCreateButton) {
-            console.error('Botão "Cancelar" (cancel-create-class) não encontrado no DOM');
-        } else {
-            console.log('Botão "Cancelar" (cancel-create-class) encontrado no DOM');
-            cancelCreateButton.addEventListener('click', () => {
-                console.log('Botão "Cancelar" do modal de criação clicado');
-                closeCreateModal();
-            });
+        if (cancelCreateButton) {
+            cancelCreateButton.addEventListener('click', closeCreateModal);
         }
 
-        // Adicionar event listener para o botão "Nova Turma"
         const createClassButton = document.getElementById('create-class-button');
         if (createClassButton) {
-            createClassButton.addEventListener('click', () => {
-                console.log('Botão "Nova Turma" clicado');
-                openCreateModal();
-            });
+            createClassButton.addEventListener('click', openCreateModal);
         }
 
-        // Adicionar event listener para o formulário de criação
         const createClassForm = document.getElementById('create-class-form');
         if (createClassForm) {
             createClassForm.addEventListener('submit', createClass);
-        } else {
-            console.error('Formulário create-class-form não encontrado no DOM');
         }
 
-        // Adicionar event listener para alternar o ícone de tipo dinamicamente
         const disciplinaSelect = document.getElementById('create-disciplina-id');
         if (disciplinaSelect) {
             disciplinaSelect.addEventListener('change', (event) => {
                 const selectedDisciplinaId = event.target.value;
                 const selectedDisciplina = disciplinas.find(d => d.id === selectedDisciplinaId);
-                console.log('Disciplina selecionada:', selectedDisciplina);
                 updateTypeIcon(selectedDisciplina ? selectedDisciplina.tipo : 'cognitiva');
             });
         }
 
-        // Carregar disciplinas e turmas
-        fetchDisciplinas();
-        fetchClasses();
+        fetchData();
 
-        // Adicionar event listeners para os botões de filtro
         document.getElementById('filter-cognitiva').addEventListener('click', () => filterClasses('cognitiva'));
         document.getElementById('filter-motora').addEventListener('click', () => filterClasses('motora'));
         document.getElementById('edit-class-form').addEventListener('submit', saveClassChanges);

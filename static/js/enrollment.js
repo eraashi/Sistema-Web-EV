@@ -3,7 +3,7 @@ let classes = [];
 let enrollments = [];
 let selectedClass = null;
 
-// Lista de unidades permitidas (fornecida pelo usuário)
+// Lista de unidades permitidas
 const allowedUnits = [
     "C.M.E. JURANDIR DA SILVA MELO",
     "C.M.E. MENALDO CARLOS DE MAGALHÃES",
@@ -39,42 +39,142 @@ const allowedUnits = [
     "C.M.E. PADRE MANUEL"
 ];
 
+// Função de retentativa para requisições
+const retryFetch = async (url, options, retries = 2, delay = 500) => {
+    const cacheKey = `cache_${url}`;
+    const cached = localStorage.getItem(cacheKey);
+    if (cached) {
+        try {
+            const { data, timestamp } = JSON.parse(cached);
+            console.log('Dados do cache:', { url, turmas_length: data.turmas?.length || 0, alunos_length: data.alunos?.data?.length || 0 }); // Log para depuração
+            if (Date.now() - timestamp < 10000 && 
+                data && 
+                Array.isArray(data.turmas) && data.turmas.length > 0 && 
+                Array.isArray(data.alunos?.data) && data.alunos.data.length > 0) {
+                return data;
+            } else {
+                console.warn('Cache inválido ou incompleto, limpando:', { url });
+                localStorage.removeItem(cacheKey);
+            }
+        } catch (e) {
+            console.warn('Erro ao processar cache do localStorage:', e.message);
+            localStorage.removeItem(cacheKey);
+        }
+    }
+
+    for (let i = 0; i < retries; i++) {
+        try {
+            const response = await fetch(url, options);
+            if (!response.ok) {
+                throw new Error(`Erro HTTP! Status: ${response.status}`);
+            }
+            const data = await response.json();
+            try {
+                localStorage.setItem(cacheKey, JSON.stringify({ data, timestamp: Date.now() }));
+            } catch (e) {
+                console.warn('Erro ao salvar no localStorage:', e.message);
+            }
+            return data;
+        } catch (error) {
+            if (i < retries - 1) {
+                console.warn(`Tentativa ${i + 1} falhou para ${url}: ${error}. Tentando novamente em ${delay}ms...`);
+                await new Promise(resolve => setTimeout(resolve, delay));
+            } else {
+                console.error(`Falhou após ${retries} tentativas para ${url}: ${error}`);
+                throw error;
+            }
+        }
+    }
+};
+
 async function loadData() {
     try {
-        const responses = await Promise.all([
-            fetch('/api/alunos', { credentials: 'include' }),
-            fetch('/api/turmas', { credentials: 'include' }),
-            fetch('/api/matriculas', { credentials: 'include' })
-        ]);
+        // Inicializar variáveis
+        students = [];
+        classes = [];
+        enrollments = [];
+        selectedClass = null;
 
-        const failedResponse = responses.find(r => !r.ok);
-        if (failedResponse) {
-            const errorText = await failedResponse.text();
-            throw new Error(`Erro na requisição: ${failedResponse.url} retornou status ${failedResponse.status}. Detalhes: ${errorText}`);
+        // Flag para controlar renderização
+        let isRendered = false;
+
+        // Tentar renderizar dados em cache
+        const cacheKey = 'cache_/api/dashboard_data';
+        const cached = localStorage.getItem(cacheKey);
+        if (cached) {
+            try {
+                const { data, timestamp } = JSON.parse(cached);
+                console.log('Dados do cache:', { 
+                    turmas_length: data.turmas?.length || 0,
+                    alunos_length: data.alunos?.data?.length || 0,
+                    matriculas_length: data.matriculas?.length || 0
+                }); // Log para depuração
+                if (Date.now() - timestamp < 10000 && 
+                    data && 
+                    Array.isArray(data.turmas) && data.turmas.length > 0 && 
+                    Array.isArray(data.alunos?.data) && data.alunos.data.length > 0) {
+                    students = data.alunos.data;
+                    classes = data.turmas;
+                    enrollments = data.matriculas || [];
+                    console.log('Cache válido usado:', {
+                        classes_length: classes.length,
+                        students_length: students.length,
+                        enrollments_length: enrollments.length
+                    }); // Log para depuração
+                    isRendered = true;
+                    filterClasses('cognitiva');
+                } else {
+                    console.warn('Cache inválido ou incompleto, limpando:', { cacheKey });
+                    localStorage.removeItem(cacheKey);
+                }
+            } catch (e) {
+                console.warn('Erro ao processar cache do localStorage:', e.message);
+                localStorage.removeItem(cacheKey);
+            }
         }
 
-        const [alunosData, classesData, enrollmentsData] = await Promise.all(responses.map(r => r.json()));
+        // Buscar dados frescos
+        const data = await retryFetch('/api/dashboard_data', { credentials: 'include' });
+        console.log('Resposta fresca de /api/dashboard_data:', { 
+            turmas_length: data.turmas?.length || 0,
+            alunos_length: data.alunos?.data?.length || 0,
+            matriculas_length: data.matriculas?.length || 0,
+            turmas_sample: data.turmas?.slice(0, 2) || [],
+            alunos_sample: data.alunos?.data?.slice(0, 2) || []
+        }); // Log para depuração
 
-        students = Array.isArray(alunosData.data) ? alunosData.data : [];
-        classes = Array.isArray(classesData) ? classesData : [];
-        enrollments = Array.isArray(enrollmentsData) ? enrollmentsData : [];
+        // Atualizar variáveis com dados frescos
+        students = Array.isArray(data.alunos?.data) ? data.alunos.data : [];
+        classes = Array.isArray(data.turmas) ? data.turmas : [];
+        enrollments = Array.isArray(data.matriculas) ? data.matriculas : [];
+        console.log('Dados frescos processados:', {
+            classes_length: classes.length,
+            students_length: students.length,
+            enrollments_length: enrollments.length
+        }); // Log para depuração
 
-        filterClasses('cognitiva');
+        // Renderizar com dados frescos
+        if (!isRendered || classes.length > 0 || students.length > 0) {
+            console.log('Renderizando com dados frescos');
+            filterClasses('cognitiva');
+        } else {
+            console.log('Pulando renderização, dados já exibidos via cache');
+        }
     } catch (error) {
-        showToast('Erro: ' + error.message, 'error', 'alert-circle');
-        window.location.href = '/login';
+        console.error('Erro em loadData:', error.message);
+        showToast('Erro ao carregar dados: ' + error.message, 'error', 'alert-circle');
+        // Renderizar com valores padrão
+        filterClasses('cognitiva');
     }
 }
 
 async function refreshEnrollments() {
     try {
-        const response = await fetch('/api/matriculas', { credentials: 'include' });
-        if (!response.ok) {
-            const errorText = await response.text();
-            throw new Error(`Erro ao recarregar matrículas: ${errorText}`);
-        }
-        return await response.json();
+        const data = await retryFetch('/api/matriculas', { credentials: 'include' });
+        console.log('Matrículas recarregadas:', data.length); // Log para depuração
+        return Array.isArray(data) ? data : enrollments;
     } catch (error) {
+        console.warn('Erro ao recarregar matrículas:', error.message);
         return enrollments;
     }
 }
@@ -219,11 +319,11 @@ function filterClasses(type) {
     const filteredClasses = classes.filter(cls => {
         const matchesSearch = cls.name.toLowerCase().includes(search);
         const matchesType = !typeFilter || cls.type === typeFilter;
-        const matchesDay = dayFilter === 'todos' || !dayFilter || cls.day === dayFilter;
-        const matchesPeriod = periodFilter === 'todos' || !periodFilter || cls.period === periodFilter;
-        const matchesPolo = poloFilter === 'todos' || !poloFilter || (cls.polo_name && cls.polo_name === poloFilter);
+        const matchesDay = !dayFilter || cls.day === dayFilter;
+        const matchesPeriod = !periodFilter || cls.period === periodFilter;
+        const matchesPolo = !poloFilter || (cls.polo_name && cls.polo_name === poloFilter);
         let matchesGrade = true;
-        if (gradeFilter && gradeFilter !== 'todos') {
+        if (gradeFilter) {
             const selectedGrades = JSON.parse(gradeFilter).map(Number);
             const classGrades = extractAcceptedGrades(cls.grades);
             matchesGrade = arraysEqual(selectedGrades, classGrades);
@@ -247,7 +347,7 @@ function filterClasses(type) {
                         </p>
                         <div class="class-item-details">
                             <p>${formatSchedule(cls.day, cls.period)}</p>
-                            <p>Faixa etária: ${formatGrades(cls.grades)} anos</p>
+                            <p>Faixa etária: ${formatGrades(cls.grades)}</p>
                             <p>Polo: ${cls.polo_name || 'Não especificado'}</p>
                         </div>
                     </div>
@@ -294,7 +394,6 @@ function deselectClass() {
     document.getElementById('enrolled-students').innerHTML = `
         <div class="text-center py-4 text-gray-500">Nenhuma turma selecionada.</div>
     `;
-    // Limpar o select de unidades
     const unitFilterSelect = document.getElementById('student-unit-filter');
     unitFilterSelect.innerHTML = '<option value="">Filtrar por unidade</option>';
     lucide.createIcons();
@@ -307,36 +406,24 @@ function filterAvailableStudents() {
     const search = document.getElementById('student-search-available').value.toLowerCase();
     const unitFilter = document.getElementById('student-unit-filter').value;
     let acceptedGrades = extractAcceptedGrades(selectedClass.grades);
-
-    // Extrair o nome base da turma selecionada (ex.: "Robótica")
     const selectedClassName = extractClassName(selectedClass.name).toLowerCase();
 
-    // Passo 1: Filtrar os alunos disponíveis sem considerar o filtro de unidade
     const potentialStudents = students.filter(student => {
-        // Filtro de busca por nome ou ID
         if (!(student.name.toLowerCase().includes(search) || student.id.includes(search))) {
             return false;
         }
-
-        // Filtro de matrícula existente
         if (enrollments.some(e => e.studentId === student.id && e.classId === selectedClass.id)) {
             return false;
         }
-
-        // Filtro por etapa (Regra 4)
         const studentGrade = extractStudentGrade(student.etapa);
         if (!(studentGrade !== null && acceptedGrades.includes(studentGrade))) {
             return false;
         }
-
-        // Filtro por polo (Regra 4)
         const normalizedStudentPolo = student.polo_name ? student.polo_name.trim().toLowerCase() : '';
         const normalizedClassPolo = selectedClass.polo_name ? selectedClass.polo_name.trim().toLowerCase() : '';
         if (normalizedStudentPolo !== normalizedClassPolo) {
             return false;
         }
-
-        // Regra 1: Máximo de 2 matrículas no mesmo dia da semana
         const studentEnrollments = enrollments.filter(e => e.studentId === student.id);
         const enrollmentsOnSameDay = studentEnrollments.filter(enrollment => {
             const enrolledClass = classes.find(cls => cls.id === enrollment.classId);
@@ -345,8 +432,6 @@ function filterAvailableStudents() {
         if (enrollmentsOnSameDay.length >= 2) {
             return false;
         }
-
-        // Regra 2: Alunos só podem ser enturmados no contraturno ao turno escolar
         const studentTurno = student.turno ? student.turno.toLowerCase() : null;
         const classPeriod = selectedClass.period ? selectedClass.period.toLowerCase() : null;
         const isContraturno = studentTurno && classPeriod && (
@@ -356,8 +441,6 @@ function filterAvailableStudents() {
         if (!isContraturno) {
             return false;
         }
-
-        // Regra 3: Para turmas motoras, o aluno deve estar matriculado em uma turma cognitiva no mesmo dia e turno
         if (selectedClass.type === 'motora') {
             const cognitiveEnrollmentsSameDayAndPeriod = studentEnrollments.filter(enrollment => {
                 const enrolledClass = classes.find(cls => cls.id === enrollment.classId);
@@ -370,43 +453,36 @@ function filterAvailableStudents() {
                 return false;
             }
         }
-
-        // Regra 5: Evitar matrículas em turmas repetidas (independente do dia)
         const hasSameClass = studentEnrollments.some(enrollment => {
             const enrolledClass = classes.find(cls => cls.id === enrollment.classId);
-            if (!enrolledClass || !enrolledClass.name) return false; // Garante que a turma exista e tenha nome
+            if (!enrolledClass || !enrolledClass.name) return false;
             const enrolledClassName = extractClassName(enrolledClass.name).toLowerCase();
             return enrolledClassName === selectedClassName;
         });
         if (hasSameClass) {
             return false;
         }
-
         return true;
     });
 
-    // Passo 2: Extrair as unidades únicas dos alunos disponíveis e preencher o select
     const unitFilterSelect = document.getElementById('student-unit-filter');
-    const currentSelectedUnit = unitFilterSelect.value; // Preserva a unidade selecionada
+    const currentSelectedUnit = unitFilterSelect.value;
     const units = [...new Set(potentialStudents.map(student => student.unidade).filter(unit => unit && allowedUnits.includes(unit)))];
-    units.sort(); // Ordena as unidades alfabeticamente
+    units.sort();
     unitFilterSelect.innerHTML = '<option value="">Filtrar por unidade</option>' + 
         units.map(unit => `<option value="${unit}">${unit}</option>`).join('');
 
-    // Restaura a unidade selecionada, se ainda estiver na lista
     if (currentSelectedUnit && units.includes(currentSelectedUnit)) {
         unitFilterSelect.value = currentSelectedUnit;
     }
 
-    // Passo 3: Aplicar o filtro de unidade
     const availableStudents = unitFilter ?
         potentialStudents.filter(student => student.unidade === unitFilter) :
         potentialStudents;
 
-    // Passo 4: Renderizar os alunos disponíveis
     const div = document.getElementById('available-students');
     div.innerHTML = availableStudents.length === 0 ?
-        '<div class="text-center py-4 text-gray-500">Nenhum aluno disponível para esta turma.</div>' :
+        '<div class="text-center py-4 text-gray-500">Nenhuma turma selecionada.</div>' :
         availableStudents.map(student => `
             <div class="flex items-center justify-between p-3 border rounded-md hover:bg-gray-50">
                 <div>
@@ -458,17 +534,14 @@ function renderEnrolledStudents() {
 
 async function enrollStudent(studentId) {
     try {
-        const response = await fetch('/api/matriculas', {
+        const response = await retryFetch('/api/matriculas', {
             method: 'POST',
             headers: { 'Content-Type': 'application/json' },
             body: JSON.stringify({ alunoId: studentId, turmaId: selectedClass.id }),
             credentials: 'include'
         });
-        if (!response.ok) {
-            const errorText = await response.text();
-            throw new Error(`Erro ao matricular aluno: ${errorText}`);
-        }
-        const newEnrollment = await response.json();
+        const newEnrollment = response;
+        console.log('Nova matrícula criada:', newEnrollment); // Log para depuração
 
         const tempEnrollment = {
             id: newEnrollment.id,
@@ -499,6 +572,7 @@ async function enrollStudent(studentId) {
         showToast('Aluno matriculado com sucesso!', 'success', 'check-circle');
         lucide.createIcons();
     } catch (error) {
+        console.error('Erro ao matricular aluno:', error.message);
         showToast('Erro: ' + error.message, 'error', 'alert-circle');
         lucide.createIcons();
     }
@@ -508,15 +582,12 @@ async function unenrollStudent(studentId) {
     try {
         const enrollment = enrollments.find(e => e.studentId === studentId && e.classId === selectedClass.id);
         if (!enrollment) throw new Error('Matrícula não encontrada');
-        const response = await fetch(`/api/matriculas/${enrollment.id}`, {
+        const response = await retryFetch(`/api/matriculas/${enrollment.id}`, {
             method: 'DELETE',
             headers: { 'Content-Type': 'application/json' },
             credentials: 'include'
         });
-        if (!response.ok) {
-            const errorText = await response.text();
-            throw new Error(`Erro ao remover matrícula: ${errorText}`);
-        }
+        console.log('Matrícula removida:', enrollment.id); // Log para depuração
         await delay(1000);
         enrollments = await refreshEnrollments();
         selectedClass.enrollmentCount -= 1;
@@ -527,6 +598,7 @@ async function unenrollStudent(studentId) {
         showToast('Aluno removido da turma com sucesso!', 'error', 'trash-2');
         lucide.createIcons();
     } catch (error) {
+        console.error('Erro ao remover matrícula:', error.message);
         showToast('Erro: ' + error.message, 'error', 'alert-circle');
         lucide.createIcons();
     }
@@ -563,11 +635,13 @@ function updateSelectedClassDetails() {
             <span>Vagas: ${selectedClass.enrollmentCount}/${selectedClass.capacity}</span>
         </div>
     `;
+    lucide.createIcons();
 }
 
 function showToast(message, type, icon) {
     const toastContainer = document.getElementById('custom-toast-container');
     if (!toastContainer) {
+        console.warn('Contêiner de toast não encontrado');
         return;
     }
 
@@ -595,8 +669,6 @@ function showToast(message, type, icon) {
 }
 
 document.addEventListener('DOMContentLoaded', () => {
-    loadData();
-
     // Adicionar event listeners para os botões
     document.getElementById('filter-cognitiva').addEventListener('click', () => filterClasses('cognitiva'));
     document.getElementById('filter-motora').addEventListener('click', () => filterClasses('motora'));
@@ -616,4 +688,49 @@ document.addEventListener('DOMContentLoaded', () => {
     // Adicionar event listeners para os inputs de busca e filtro por unidade de alunos disponíveis
     document.getElementById('student-search-available').addEventListener('input', filterAvailableStudents);
     document.getElementById('student-unit-filter').addEventListener('change', filterAvailableStudents);
+
+    // Carregar dados
+    loadData();
 });
+
+// Estilos para tags de tipo de turma
+const style = document.createElement('style');
+style.innerHTML = `
+    .class-type-tag {
+        display: inline-block;
+        padding: 2px 8px;
+        border-radius: 12px;
+        font-size: 12px;
+        font-weight: 500;
+        margin-left: 8px;
+        color: white;
+    }
+    .class-type-tag.cognitiva {
+        background-color: #86efac;
+    }
+    .class-type-tag.motora {
+        background-color: #d8b4fe;
+    }
+    .class-item-details {
+        margin-top: 4px;
+        color: #4b5563;
+        font-size: 14px;
+    }
+    .detail-item {
+        display: flex;
+        align-items: center;
+        gap: 8px;
+        margin-bottom: 8px;
+    }
+    .detail-item i {
+        height: 16px;
+        width: 16px;
+        color: #3b82f6;
+    }
+    .separator {
+        margin: 16px 0;
+        border: none;
+        border-top: 1px solid #e5e7eb;
+    }
+`;
+document.head.appendChild(style);

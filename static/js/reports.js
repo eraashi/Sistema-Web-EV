@@ -107,6 +107,54 @@ const retornoPorTurma = [
     { name: 'Teclado', retorno: 5 },
 ];
 
+// Função de retentativa para requisições
+const retryFetch = async (url, options, retries = 2, delay = 500) => {
+    const cacheKey = `cache_${url}`;
+    const cached = localStorage.getItem(cacheKey);
+    if (cached) {
+        try {
+            const { data, timestamp } = JSON.parse(cached);
+            console.log('Dados do cache:', { url, turmas_length: data.turmas?.length || 0, alunos_length: data.alunos?.data?.length || 0 }); // Log para depuração
+            if (Date.now() - timestamp < 10000 && 
+                data && 
+                Array.isArray(data.turmas) && data.turmas.length > 0 && 
+                Array.isArray(data.alunos?.data) && data.alunos.data.length > 0) {
+                return data;
+            } else {
+                console.warn('Cache inválido ou incompleto, limpando:', { url });
+                localStorage.removeItem(cacheKey);
+            }
+        } catch (e) {
+            console.warn('Erro ao processar cache do localStorage:', e.message);
+            localStorage.removeItem(cacheKey);
+        }
+    }
+
+    for (let i = 0; i < retries; i++) {
+        try {
+            const response = await fetch(url, options);
+            if (!response.ok) {
+                throw new Error(`Erro HTTP! Status: ${response.status}`);
+            }
+            const data = await response.json();
+            try {
+                localStorage.setItem(cacheKey, JSON.stringify({ data, timestamp: Date.now() }));
+            } catch (e) {
+                console.warn('Erro ao salvar no localStorage:', e.message);
+            }
+            return data;
+        } catch (error) {
+            if (i < retries - 1) {
+                console.warn(`Tentativa ${i + 1} falhou para ${url}: ${error}. Tentando novamente em ${delay}ms...`);
+                await new Promise(resolve => setTimeout(resolve, delay));
+            } else {
+                console.error(`Falhou após ${retries} tentativas para ${url}: ${error}`);
+                throw error;
+            }
+        }
+    }
+};
+
 // Função de debounce para limitar chamadas ao filtro
 function debounce(func, wait) {
     let timeout;
@@ -121,51 +169,130 @@ function debounce(func, wait) {
 }
 
 async function fetchData() {
-    try {
-        // Mostrar overlay de carregamento
-        const overlay = document.getElementById('loading-overlay');
-        overlay.classList.remove('hidden');
+    const overlay = document.getElementById('loading-overlay');
+    const mainContent = document.getElementById('main-content');
 
-        const responses = await Promise.all([
-            fetch('/api/alunos', { credentials: 'include' }),
-            fetch('/api/turmas', { credentials: 'include' }),
-            fetch('/api/matriculas', { credentials: 'include' }),
-            fetch('/api/turmas_ativas', { credentials: 'include' }),
-            fetch('/api/polos', { credentials: 'include' })
-        ]);
-        if (!responses.every(r => r.ok)) {
-            const failedResponse = responses.find(r => !r.ok);
-            const errorText = await failedResponse.text();
-            throw new Error(`Erro ao carregar dados: ${failedResponse.url} retornou status ${failedResponse.status}. Detalhes: ${errorText}`);
+    // Mostrar overlay de carregamento
+    if (overlay && mainContent) {
+        overlay.classList.remove('hidden');
+        mainContent.classList.add('pointer-events-none');
+    } else {
+        console.warn('Elementos de overlay ou main-content não encontrados');
+    }
+
+    try {
+        // Inicializar variáveis
+        students = [];
+        classes = [];
+        enrollments = [];
+        activeClasses = [];
+        polos = [];
+        studentsWithoutEnrollments = [];
+
+        // Flag para controlar renderização
+        let isRendered = false;
+
+        // Tentar renderizar dados em cache
+        const cacheKey = 'cache_/api/dashboard_data';
+        const cached = localStorage.getItem(cacheKey);
+        if (cached) {
+            try {
+                const { data, timestamp } = JSON.parse(cached);
+                console.log('Dados do cache:', { 
+                    turmas_length: data.turmas?.length || 0,
+                    alunos_length: data.alunos?.data?.length || 0,
+                    turmas_ativas_length: data.turmas_ativas?.turmas?.length || 0
+                }); // Log para depuração
+                if (Date.now() - timestamp < 10000 && 
+                    data && 
+                    Array.isArray(data.turmas) && data.turmas.length > 0 && 
+                    Array.isArray(data.alunos?.data) && data.alunos.data.length > 0) {
+                    students = data.alunos.data;
+                    classes = data.turmas;
+                    enrollments = data.matriculas || [];
+                    activeClasses = data.turmas_ativas?.turmas || [];
+                    polos = []; // Polos não estão em /api/dashboard_data, serão buscados separadamente
+                    studentsWithoutEnrollments = students.filter(student => {
+                        return !enrollments.some(e => String(e.studentId).toLowerCase().trim() === String(student.id).toLowerCase().trim());
+                    });
+                    console.log('Cache válido usado:', {
+                        classes_length: classes.length,
+                        students_length: students.length,
+                        activeClasses_length: activeClasses.length,
+                        studentsWithoutEnrollments_length: studentsWithoutEnrollments.length
+                    }); // Log para depuração
+                    isRendered = true;
+                    renderReports(data.turmas_ativas?.current_period || 'tarde', data.turmas_ativas?.current_day || null);
+                } else {
+                    console.warn('Cache inválido ou incompleto, limpando:', { cacheKey });
+                    localStorage.removeItem(cacheKey);
+                }
+            } catch (e) {
+                console.warn('Erro ao processar cache do localStorage:', e.message);
+                localStorage.removeItem(cacheKey);
+            }
         }
 
-        const [alunosData, classesData, enrollmentsData, activeClassesData, polosData] = await Promise.all(responses.map(r => r.json()));
-        console.log('Dados brutos:', { alunosData, classesData, enrollmentsData, activeClassesData, polosData });
+        // Buscar dados frescos
+        const data = await retryFetch('/api/dashboard_data', { credentials: 'include' });
+        console.log('Resposta fresca de /api/dashboard_data:', { 
+            turmas_length: data.turmas?.length || 0,
+            alunos_length: data.alunos?.data?.length || 0,
+            turmas_ativas_length: data.turmas_ativas?.turmas?.length || 0,
+            turmas_sample: data.turmas?.slice(0, 2) || [],
+            alunos_sample: data.alunos?.data?.slice(0, 2) || []
+        }); // Log para depuração
 
-        students = Array.isArray(alunosData.data) ? alunosData.data : [];
-        classes = Array.isArray(classesData) ? classesData : [];
-        enrollments = Array.isArray(enrollmentsData) ? enrollmentsData : [];
-        activeClasses = Array.isArray(activeClassesData.turmas) ? activeClassesData.turmas : [];
-        polos = Array.isArray(polosData) ? polosData : [];
-
-        // Calcular alunos sem matrículas uma única vez
+        // Atualizar variáveis com dados frescos
+        students = Array.isArray(data.alunos?.data) ? data.alunos.data : [];
+        classes = Array.isArray(data.turmas) ? data.turmas : [];
+        enrollments = Array.isArray(data.matriculas) ? data.matriculas : [];
+        activeClasses = Array.isArray(data.turmas_ativas?.turmas) ? data.turmas_ativas.turmas : [];
+        polos = []; // Polos não estão em /api/dashboard_data, buscar separadamente
         studentsWithoutEnrollments = students.filter(student => {
-            const isNotEnrolled = !enrollments.some(e => String(e.studentId).toLowerCase().trim() === String(student.id).toLowerCase().trim());
-            return isNotEnrolled;
+            return !enrollments.some(e => String(e.studentId).toLowerCase().trim() === String(student.id).toLowerCase().trim());
         });
+        console.log('Dados frescos processados:', {
+            classes_length: classes.length,
+            students_length: students.length,
+            activeClasses_length: activeClasses.length,
+            studentsWithoutEnrollments_length: studentsWithoutEnrollments.length
+        }); // Log para depuração
 
-        console.log('Alunos:', students);
-        console.log('Turmas:', classes);
-        console.log('Matrículas:', enrollments);
-        console.log('Turmas Ativas:', activeClasses);
-        console.log('Polos:', polos);
-        console.log('Alunos sem matrículas (studentsWithoutEnrollments):', studentsWithoutEnrollments.length, studentsWithoutEnrollments.slice(0, 5));
+        // Buscar polos separadamente, se necessário
+        if (!isRendered || polos.length === 0) {
+            try {
+                const polosData = await retryFetch('/api/polos', { credentials: 'include' });
+                polos = Array.isArray(polosData) ? polosData : [];
+                console.log('Polos carregados:', polos.length); // Log para depuração
+            } catch (e) {
+                console.warn('Erro ao carregar polos:', e.message);
+                polos = [];
+            }
+        }
 
-        renderReports(activeClassesData.current_period, activeClassesData.current_day);
+        // Renderizar com dados frescos
+        if (!isRendered || classes.length > 0 || students.length > 0) {
+            console.log('Renderizando com dados frescos');
+            renderReports(data.turmas_ativas?.current_period || 'tarde', data.turmas_ativas?.current_day || null);
+        } else {
+            console.log('Pulando renderização, dados já exibidos via cache');
+        }
+
+        // Esconder overlay
+        if (overlay && mainContent) {
+            overlay.classList.add('hidden');
+            mainContent.classList.remove('pointer-events-none');
+        }
     } catch (error) {
-        console.error('Erro ao carregar dados:', error);
-        alert('Erro: ' + error.message);
-        window.location.href = '/login';
+        console.error('Erro em fetchData:', error.message);
+        showToast('Erro ao carregar dados: ' + error.message, 'error', 'alert-circle');
+        // Renderizar com valores padrão
+        renderReports('tarde', null);
+        if (overlay && mainContent) {
+            overlay.classList.add('hidden');
+            mainContent.classList.remove('pointer-events-none');
+        }
     }
 }
 
@@ -217,11 +344,42 @@ function formatarNumero(numero) {
     return numero.toLocaleString('pt-BR');
 }
 
+function showToast(message, type, icon) {
+    const toastContainer = document.getElementById('custom-toast-container');
+    if (!toastContainer) {
+        console.warn('Contêiner de toast não encontrado');
+        return;
+    }
+
+    const toastDiv = document.createElement('div');
+    toastDiv.className = `custom-toast custom-toast-${type}`;
+    toastDiv.innerHTML = `
+        <i data-lucide="${icon}" class="custom-toast-icon h-3 w-3"></i>
+        <span class="custom-toast-message">${message}</span>
+        <button class="custom-toast-close">×</button>
+    `;
+
+    toastContainer.appendChild(toastDiv);
+
+    lucide.createIcons();
+
+    const timeout = setTimeout(() => {
+        toastDiv.remove();
+    }, 3000);
+
+    const closeButton = toastDiv.querySelector('.custom-toast-close');
+    closeButton.addEventListener('click', () => {
+        clearTimeout(timeout);
+        toastDiv.remove();
+    });
+}
+
 function openStudentsModal(classId) {
     console.log('Abrindo modal para turma ID:', classId);
     const cls = activeClasses.find(c => c.id === classId);
     if (!cls) {
         console.error('Turma não encontrada para ID:', classId);
+        showToast('Turma não encontrada', 'error', 'alert-circle');
         return;
     }
 
@@ -343,8 +501,7 @@ function filterAvailableStudents(page = 1, search = '') {
         }) :
         studentsWithoutEnrollments;
 
-    console.log('Alunos disponíveis filtrados:', availableStudents);
-    console.log('Número de alunos disponíveis:', availableStudents.length);
+    console.log('Alunos disponíveis filtrados:', availableStudents.length);
 
     // Calcular paginação
     availableStudentsTotalPages = Math.ceil(availableStudents.length / STUDENTS_PER_PAGE);
@@ -414,7 +571,7 @@ function renderDistribuicaoCharts() {
         alunosFaixaEtariaChart.destroy();
     }
 
-    const alunosDisciplinaCtx= document.getElementById('alunos-por-disciplina-chart').getContext('2d');
+    const alunosDisciplinaCtx = document.getElementById('alunos-por-disciplina-chart').getContext('2d');
     alunosDisciplinaChart = new Chart(alunosDisciplinaCtx, {
         type: 'bar',
         data: {
@@ -703,6 +860,14 @@ function renderMovimentacaoCharts() {
 }
 
 function renderReports(currentPeriod, currentDay) {
+    console.log('Renderizando relatórios:', {
+        students_length: students.length,
+        classes_length: classes.length,
+        enrollments_length: enrollments.length,
+        activeClasses_length: activeClasses.length,
+        polos_length: polos.length
+    }); // Log para depuração
+
     document.getElementById('current-period').textContent = currentPeriod === 'manha' ? 'Manhã' : 'Tarde';
     document.getElementById('current-day').textContent = currentDay ? formatSchedule(currentDay, null, false) : 'Sem aulas hoje';
 
@@ -756,8 +921,8 @@ function renderReports(currentPeriod, currentDay) {
     const estatisticasGerais = {
         totalAlunos: students.length,
         mediaFrequencia: 92.5,
-        alunosNovos: alunosNovosData.reduce((sum, d) => sum + d.alunos, 0), // Soma dos alunos novos
-        trocasTurma: trocasTurmaData.reduce((sum, d) => sum + d.trocas, 0) // Soma das trocas de turma
+        alunosNovos: alunosNovosData.reduce((sum, d) => sum + d.alunos, 0),
+        trocasTurma: trocasTurmaData.reduce((sum, d) => sum + d.trocas, 0)
     };
     document.getElementById('total-alunos').textContent = formatarNumero(estatisticasGerais.totalAlunos);
     document.getElementById('media-frequencia').textContent = `${estatisticasGerais.mediaFrequencia}%`;
@@ -772,7 +937,7 @@ function renderReports(currentPeriod, currentDay) {
 
     // Paginate Enrolled Students
     const enrolledStudents = Array.isArray(students) ? students.filter(student => enrollments.some(e => String(e.studentId).toLowerCase().trim() === String(student.id).toLowerCase().trim())) : [];
-    console.log('Alunos matriculados:', enrolledStudents);
+    console.log('Alunos matriculados:', enrolledStudents.length);
     enrolledStudentsTotalPages = Math.ceil(enrolledStudents.length / STUDENTS_PER_PAGE);
     enrolledStudentsCurrentPage = 1;
     const startEnrolled = (enrolledStudentsCurrentPage - 1) * STUDENTS_PER_PAGE;
@@ -816,13 +981,7 @@ function renderReports(currentPeriod, currentDay) {
     lucide.createIcons();
 
     renderDistribuicaoCharts();
-
-    // Esconder overlay e reativar interações após renderização inicial
     filterAvailableStudents(1);
-    const overlay = document.getElementById('loading-overlay');
-    const mainContent = document.getElementById('main-content');
-    overlay.classList.add('hidden');
-    mainContent.classList.remove('pointer-events-none');
 }
 
 const style = document.createElement('style');
@@ -847,16 +1006,14 @@ document.head.appendChild(style);
 // Configurar debounce para o campo de busca
 document.addEventListener('DOMContentLoaded', () => {
     showTab('distribuicao');
-    filterAvailableStudents(1); // Carregar todos os alunos disponíveis na inicialização
-
     const searchInput = document.getElementById('student-search-available');
     const debouncedSearch = debounce((value) => {
         filterAvailableStudents(1, value);
-    }, 300); // 300ms de espera
+    }, 300);
 
     searchInput.addEventListener('input', (e) => {
         debouncedSearch(e.target.value);
     });
-});
 
-document.addEventListener('DOMContentLoaded', fetchData);
+    fetchData();
+});
