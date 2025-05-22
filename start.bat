@@ -1,0 +1,6 @@
+@echo off
+echo Iniciando Redis...
+start "Redis" cmd /k C:\Redis\redis-server.exe
+echo Iniciando Waitress...
+cd %~dp0
+waitress-serve --listen=0.0.0.0:5000 app:app

@@ -8,6 +8,8 @@ import pytz
 import redis
 import json
 import logging
+import httpx
+from unidecode import unidecode
 
 app = Flask(__name__)
 load_dotenv()
@@ -23,27 +25,29 @@ app.config['SESSION_PERMANENT'] = True
 app.config['PERMANENT_SESSION_LIFETIME'] = 3600
 app.config['SESSION_COOKIE_HTTPONLY'] = True
 app.config['SESSION_COOKIE_SAMESITE'] = 'Lax'
-app.config['SESSION_COOKIE_SECURE'] = True  # True para produção com HTTPS
+app.config['SESSION_COOKIE_SECURE'] = True
 app.config['SESSION_REDIS'] = redis.Redis.from_url(
-    os.getenv('REDIS_URL', 'redis://localhost:6379'),
-    ssl_cert_reqs=None
+    os.getenv('REDIS_URL'),  # Não usa fallback para localhost
+    decode_responses=True,
+    ssl=True,  # Habilitar TLS para rediss://
+    socket_timeout=5,
+    socket_connect_timeout=5
 )
-
-# Configuração do Supabase
-supabase = create_client(os.getenv('SUPABASE_URL'), os.getenv('SUPABASE_ANON_KEY'))
 
 # Configuração do Redis
 redis_client = redis.Redis.from_url(
-    os.getenv('REDIS_URL', 'redis://localhost:6379'),
-    ssl_cert_reqs=None,
-    decode_responses=True
+    os.getenv('REDIS_URL'),  # Não usa fallback para localhost
+    decode_responses=True,
+    ssl=True,  # Habilitar TLS para rediss://
+    socket_timeout=5,
+    socket_connect_timeout=5
 )
 
 # Testar conexão ao Redis na inicialização
 try:
     redis_client.ping()
     logger.info('Conexão com Redis bem-sucedida')
-except Exception as e:
+except redis.RedisError as e:
     logger.error(f'Erro ao conectar ao Redis: {str(e)}')
 
 @app.route('/test_redis')
@@ -58,13 +62,22 @@ def test_redis():
         logger.error(f'Erro no Redis: {str(e)}')
         return f'Erro no Redis: {str(e)}', 500
 
-@retry(stop_max_attempt_number=3, wait_fixed=500)
+@retry(stop_max_attempt_number=3, wait_fixed=1000)  # 3 tentativas, espera de 1 segundo entre tentativas
 def execute_supabase_query(query):
     try:
-        return query.execute().data
+        # Usar httpx com timeout explícito
+        with httpx.Client(timeout=10.0) as client:  # Timeout de 30 segundos por requisição
+            response = query.execute()
+            if response.data is None:
+                logger.warning("Nenhum dado retornado pela query do Supabase")
+                return []
+            return response.data
+    except httpx.TimeoutException as te:
+        logger.error(f"Timeout ao executar query no Supabase: {str(te)}")
+        raise  # Levanta a exceção para retry
     except Exception as e:
-        print(f"Erro na query do Supabase: {str(e)}")
-        raise
+        logger.error(f"Erro na query do Supabase: {str(e)}")
+        raise  # Levanta a exceção para retry
 
 def get_current_user():
     user_id = session.get('user_id')
@@ -110,6 +123,7 @@ def invalidate_turmas_ativas_cache():
             cursor, keys = redis_client.scan(cursor=cursor, match='turmas_ativas:*', count=100)
             if keys:
                 redis_client.delete(*keys)
+                print(f"Cache de turmas_ativas limpo: {keys}")
             if cursor == 0:
                 break
         cursor = 0
@@ -117,6 +131,7 @@ def invalidate_turmas_ativas_cache():
             cursor, keys = redis_client.scan(cursor=cursor, match='dashboard_data:*', count=100)
             if keys:
                 redis_client.delete(*keys)
+                print(f"Cache de dashboard_data limpo: {keys}")
             if cursor == 0:
                 break
     except Exception as e:
@@ -147,7 +162,28 @@ def students():
         print("Nenhum usuário autenticado em /students, redirecionando para login")
         return redirect(url_for('login'))
     print(f"Usuário autenticado em /students: {user['id']}")
-    return render_template('student_list.html', user=user)
+
+    # Inicializar variáveis para o polo e unidades
+    polo_data = {'nome': '', 'unidades': []}
+    
+    # Se o usuário for um coordenador, buscar as unidades do polo dele
+    if user['cargo'] == 'coordenador' and user.get('polo_id'):
+        try:
+            polo_query = supabase.table('polos').select('nome, unidades').eq('id', user['polo_id']).single()
+            polo_result = execute_supabase_query(polo_query)
+            if polo_result and 'unidades' in polo_result and polo_result['unidades']:
+                polo_data = {
+                    'nome': polo_result['nome'],
+                    'unidades': [unidade for unidade in polo_result['unidades'] if isinstance(unidade, str)]
+                }
+                print(f"Unidades encontradas para o polo {user['polo_id']} ({polo_data['nome']}): {polo_data['unidades']}")
+            else:
+                print(f"Nenhuma unidade encontrada para o polo {user['polo_id']}")
+        except Exception as e:
+            print(f"Erro ao buscar unidades do polo {user['polo_id']}: {str(e)}")
+    
+    # Renderizar o template passando o user e os dados do polo
+    return render_template('student_list.html', user=user, polo_data=polo_data)
 
 @app.route('/reports')
 def reports():
@@ -208,39 +244,53 @@ def logs():
 
 @app.route('/reports_busca_ativa')
 def reports_busca_ativa():
-    return render_template('reports_busca_ativa.html')
+    user = get_current_user()
+    if not user:
+        print("Nenhum usuário autenticado em /reports_busca_ativa, redirecionando para login")
+        return redirect(url_for('login'))
+    print(f"Usuário autenticado em /reports_busca_ativa: {user['id']}")
+    return render_template('reports_busca_ativa.html', user=user)
 
 @app.route('/login', methods=['GET', 'POST'])
 def login():
     if request.method == 'POST':
         data = request.json
-        cpf = data.get('cpf')
-        password = data.get('password')
-        print(f"Tentativa de login com CPF: {cpf}")
+        cpf = data.get('cpf', '').strip()
+        password = data.get('password', '').strip()
+
+        # Limpar o CPF para conter apenas números
+        cpf_cleaned = ''.join(filter(str.isdigit, cpf))
+        print(f"Tentativa de login com CPF (limpo): {cpf_cleaned}, CPF original: {cpf}")
+
         try:
+            # Aumentar retentativas e timeout
             funcionarios = execute_supabase_query(
-                supabase.table('funcionarios').select('*').eq('cpf', cpf).eq('senha', password)
+                supabase.table('funcionarios').select('*').eq('cpf', cpf_cleaned).eq('senha', password)
             )
+            print(f"Resultado da query para CPF {cpf_cleaned}: {funcionarios}")
+
             if not funcionarios or len(funcionarios) == 0:
                 print("Funcionário não encontrado ou senha incorreta")
                 return jsonify({'error': 'Credenciais de login inválidas'}), 401
             if len(funcionarios) > 1:
-                print("Erro: Múltiplos funcionários encontrados para o mesmo CPF e senha")
+                print(f"Erro: Múltiplos funcionários encontrados para o CPF {cpf_cleaned}")
                 return jsonify({'error': 'Múltiplos usuários encontrados'}), 400
+
             funcionario = funcionarios[0]
-            print(f"Funcionário autenticado: {funcionario['id']}")
+            print(f"Funcionário autenticado: {funcionario['id']}, Cargo: {funcionario['cargo']}")
             session['user_id'] = funcionario['id']
             print(f"Sessão atualizada: {session}")
+
             log_action(
                 user_id=funcionario['id'],
                 action_type='LOGIN',
                 entity_type='USER',
-                details={'cpf': cpf}
+                details={'cpf': cpf_cleaned}
             )
             return jsonify({'user': funcionario, 'redirect': url_for('dashboard')})
         except Exception as e:
-            print(f"Erro no login: {str(e)}")
-            return jsonify({'error': 'Credenciais de login inválidas'}), 401
+            print(f"Erro no login para CPF {cpf_cleaned}: {str(e)}")
+            return jsonify({'error': 'Erro interno ao processar login. Tente novamente.'}), 500
     return render_template('login.html')
 
 @app.route('/logout', methods=['POST'])
@@ -263,7 +313,18 @@ def get_presencas():
     if not user:
         print("Erro: Usuário não autenticado em /api/presencas")
         return jsonify({'error': 'Não autorizado'}), 401
+
+    # Gerar chave de cache
+    cache_key = f"presencas:{user['id']}:{user['cargo']}"
+    cached_data = redis_client.get(cache_key)
+    if cached_data:
+        print(f"Cache hit para presencas: {cache_key}, tamanho: {len(cached_data)} bytes")
+        return jsonify(json.loads(cached_data))
+
     try:
+        # Adicionar log para verificar o usuário e seu polo_id
+        print(f"Usuário: {user['id']}, Cargo: {user['cargo']}, Polo ID: {user.get('polo_id')}")
+
         query = supabase.from_('presenca').select(
             'id, id_aluno, matricula, nome_aluno, unidade, etapa, turno_escola_viva, presenca, data_escaneamento, hora_escaneamento, turma_id, turmas!turma_id(nome, faixa_etaria, polo_id, polos!turmas_polo_id_fkey(nome))'
         )
@@ -276,6 +337,8 @@ def get_presencas():
                 print("Erro: Usuário sem polo_id definido")
                 return jsonify({'error': 'Usuário não tem polo associado'}), 400
             print(f"Filtrando presenças para o polo_id do usuário: {user['polo_id']}")
+            # Adicionar log para a query
+            print(f"Executando query para presenças com polo_id: {user['polo_id']}")
             presencas = execute_supabase_query(
                 query.match({'turmas.polo_id': user['polo_id']})
             )
@@ -283,36 +346,55 @@ def get_presencas():
             print("Usuário sem permissão para visualizar presenças")
             presencas = []
 
+        # Adicionar log para verificar o resultado da query
+        print(f"Total de presenças encontradas: {len(presencas)}")
         if not presencas:
             print("Nenhuma presença encontrada para o polo do usuário")
-            return jsonify([])
+            # Retornar lista vazia em vez de erro
+            response_data = []
+            redis_client.setex(cache_key, 300, json.dumps(response_data))
+            return jsonify(response_data)
 
         result = []
         for presenca in presencas:
-            turma = presenca.get('turmas', {})
-            polo = turma.get('polos', {}) if turma else {}
+            try:
+                turma = presenca.get('turmas', {})
+                polo = turma.get('polos', {}) if turma else {}
 
-            if user['cargo'] in ['monitor', 'diretor', 'coordenador']:
-                turma_polo_id = turma.get('polo_id')
-                if turma_polo_id != user['polo_id']:
-                    continue
+                # Adicionar log para verificar os dados da presença
+                print(f"Processando presença ID {presenca['id']}: Turma ID {presenca['turma_id']}, Polo ID {turma.get('polo_id')}")
 
-            result.append({
-                'id': presenca['id'],
-                'id_aluno': presenca['id_aluno'],
-                'matricula': presenca['matricula'],
-                'nome_aluno': presenca['nome_aluno'],
-                'unidade': presenca['unidade'],
-                'etapa': presenca['etapa'],
-                'turno_escola_viva': presenca['turno_escola_viva'],
-                'presenca': presenca['presenca'],
-                'data_escaneamento': presenca['data_escaneamento'],
-                'hora_escaneamento': presenca['hora_escaneamento'],
-                'turma_id': presenca['turma_id'],
-                'turma_nome': turma.get('nome', 'Não especificado'),
-                'faixa_etaria': turma.get('faixa_etaria', []),
-                'polo_nome': polo.get('nome', 'Não especificado')
-            })
+                if user['cargo'] in ['monitor', 'diretor', 'coordenador']:
+                    turma_polo_id = turma.get('polo_id')
+                    if turma_polo_id != user['polo_id']:
+                        print(f"Presença ID {presenca['id']} ignorada: polo_id {turma_polo_id} não corresponde ao polo do usuário {user['polo_id']}")
+                        continue
+
+                result.append({
+                    'id': presenca['id'],
+                    'id_aluno': presenca['id_aluno'],
+                    'matricula': presenca['matricula'],
+                    'nome_aluno': presenca['nome_aluno'],
+                    'unidade': presenca['unidade'],
+                    'etapa': presenca['etapa'],
+                    'turno_escola_viva': presenca['turno_escola_viva'],
+                    'presenca': presenca['presenca'],
+                    'data_escaneamento': presenca['data_escaneamento'],
+                    'hora_escaneamento': presenca['hora_escaneamento'],
+                    'turma_id': presenca['turma_id'],
+                    'turma_nome': turma.get('nome', 'Não especificado'),
+                    'faixa_etaria': turma.get('faixa_etaria', []),
+                    'polo_nome': polo.get('nome', 'Não especificado')
+                })
+            except Exception as e:
+                print(f"Erro ao processar presença ID {presenca['id']}: {str(e)}")
+                continue
+
+        # Adicionar log para o resultado final
+        print(f"Total de presenças após processamento: {len(result)}")
+
+        # Armazenar no cache por 5 minutos
+        redis_client.setex(cache_key, 300, json.dumps(result))
         return jsonify(result)
     except Exception as e:
         print(f"Erro em get_presencas: {str(e)}")
@@ -324,7 +406,18 @@ def get_ocorrencias():
     if not user:
         print("Erro: Usuário não autenticado em /api/ocorrencias")
         return jsonify({'error': 'Não autorizado'}), 401
+
+    # Gerar chave de cache
+    cache_key = f"ocorrencias:{user['id']}:{user['cargo']}"
+    cached_data = redis_client.get(cache_key)
+    if cached_data:
+        print(f"Cache hit para ocorrencias: {cache_key}, tamanho: {len(cached_data)} bytes")
+        return jsonify(json.loads(cached_data))
+
     try:
+        # Adicionar log para verificar o usuário e seu polo_id
+        print(f"Usuário: {user['id']}, Cargo: {user['cargo']}, Polo ID: {user.get('polo_id')}")
+
         query = supabase.table('ocorrencias').select(
             'id, turma_id, ocorrencia, data_escaneamento, turmas!turma_id(nome, faixa_etaria, periodo, polo_id, polos!turmas_polo_id_fkey(nome))'
         )
@@ -337,6 +430,8 @@ def get_ocorrencias():
                 print("Erro: Usuário sem polo_id definido")
                 return jsonify({'error': 'Usuário não tem polo associado'}), 400
             print(f"Filtrando ocorrências para o polo_id do usuário: {user['polo_id']}")
+            # Adicionar log para a query
+            print(f"Executando query para ocorrências com polo_id: {user['polo_id']}")
             ocorrencias = execute_supabase_query(
                 query.match({'turmas.polo_id': user['polo_id']})
             )
@@ -344,30 +439,49 @@ def get_ocorrencias():
             print("Usuário sem permissão para visualizar ocorrências")
             ocorrencias = []
 
+        # Adicionar log para verificar o resultado da query
+        print(f"Total de ocorrências encontradas: {len(ocorrencias)}")
         if not ocorrencias:
             print("Nenhuma ocorrência encontrada para o polo do usuário")
-            return jsonify([])
+            # Retornar lista vazia em vez de erro
+            response_data = []
+            redis_client.setex(cache_key, 300, json.dumps(response_data))
+            return jsonify(response_data)
 
         result = []
         for ocorrencia in ocorrencias:
-            turma = ocorrencia.get('turmas', {})
-            polo = turma.get('polos', {}) if turma else {}
+            try:
+                turma = ocorrencia.get('turmas', {})
+                polo = turma.get('polos', {}) if turma else {}
 
-            if user['cargo'] in ['monitor', 'diretor', 'coordenador']:
-                turma_polo_id = turma.get('polo_id')
-                if turma_polo_id != user['polo_id']:
-                    continue
+                # Adicionar log para verificar os dados da ocorrência
+                print(f"Processando ocorrência ID {ocorrencia['id']}: Turma ID {ocorrencia['turma_id']}, Polo ID {turma.get('polo_id')}")
 
-            result.append({
-                'id': ocorrencia['id'],
-                'turma_id': ocorrencia['turma_id'],
-                'ocorrencia': ocorrencia['ocorrencia'],
-                'data_escaneamento': ocorrencia['data_escaneamento'],
-                'turma_nome': turma.get('nome', 'Não especificado'),
-                'faixa_etaria': turma.get('faixa_etaria', []),
-                'turno': turma.get('periodo', 'Não especificado'),
-                'polo_nome': polo.get('nome', 'Não especificado')
-            })
+                if user['cargo'] in ['monitor', 'diretor', 'coordenador']:
+                    turma_polo_id = turma.get('polo_id')
+                    if turma_polo_id != user['polo_id']:
+                        print(f"Ocorrência ID {ocorrencia['id']} ignorada: polo_id {turma_polo_id} não corresponde ao polo do usuário {user['polo_id']}")
+                        continue
+
+                result.append({
+                    'id': ocorrencia['id'],
+                    'turma_id': ocorrencia['turma_id'],
+                    'ocorrencia': ocorrencia['ocorrencia'],
+                    'data_escaneamento': ocorrencia['data_escaneamento'],
+                    'turma_nome': turma.get('nome', 'Não especificado'),
+                    'faixa_etaria': turma.get('faixa_etaria', []),
+                    'turno': turma.get('periodo', 'Não especificado'),
+                    'polo_nome': polo.get('nome', 'Não especificado')
+                })
+            except Exception as e:
+                print(f"Erro ao processar ocorrência ID {ocorrencia['id']}: {str(e)}")
+                continue
+
+        # Adicionar log para o resultado final
+        print(f"Total de ocorrências após processamento: {len(result)}")
+
+        # Armazenar no cache por 5 minutos
+        redis_client.setex(cache_key, 300, json.dumps(result))
         return jsonify(result)
     except Exception as e:
         print(f"Erro em get_ocorrencias: {str(e)}")
@@ -380,11 +494,22 @@ def manage_funcionarios():
         print("Erro: Usuário não autenticado em /api/funcionarios")
         return jsonify({'error': 'Não autorizado'}), 401
 
+    # Gerar chave de cache para GET
+    if request.method == 'GET':
+        nome = request.args.get('nome', '').strip()
+        cargo = request.args.get('cargo', '').strip()
+        polo = request.args.get('polo', '').strip()
+        cache_key = f"funcionarios:{user['id']}:{nome}:{cargo}:{polo}"
+        cached_data = redis_client.get(cache_key)
+        if cached_data:
+            print(f"Cache hit para funcionarios: {cache_key}, tamanho: {len(cached_data)} bytes")
+            return jsonify(json.loads(cached_data))
+
     if request.method == 'GET':
         try:
-            nome = request.args.get('nome', '').strip()
-            cargo = request.args.get('cargo', '').strip()
-            polo = request.args.get('polo', '').strip()
+            if user['cargo'] not in ['admin', 'secretaria']:
+                print("Erro: Usuário não tem permissão para acessar esta rota")
+                return jsonify({'error': 'Proibido: Apenas admin ou secretaria podem acessar esta rota'}), 403
 
             query = supabase.table('funcionarios').select('id, nome, cpf, cargo, polo_id, polos!funcionarios_polo_id_fkey(nome), unidade, created_at')
             query = query.not_.in_('cargo', ['admin', 'secretaria'])
@@ -397,10 +522,6 @@ def manage_funcionarios():
                 query = query.eq('polo_id', (
                     supabase.table('polos').select('id').eq('nome', polo).execute().data[0]['id']
                 ))
-
-            if user['cargo'] not in ['admin', 'secretaria']:
-                print("Erro: Usuário não tem permissão para acessar esta rota")
-                return jsonify({'error': 'Proibido: Apenas admin ou secretaria podem acessar esta rota'}), 403
 
             funcionarios = execute_supabase_query(query)
 
@@ -429,6 +550,9 @@ def manage_funcionarios():
                     'unidade': funcionario.get('unidade', 'Não especificado'),
                     'created_at': created_at
                 })
+
+            # Armazenar no cache por 5 minutos
+            redis_client.setex(cache_key, 300, json.dumps(result))
             return jsonify(result)
         except Exception as e:
             print(f"Erro em get_funcionarios: {str(e)}")
@@ -480,6 +604,14 @@ def manage_funcionario(id):
     if not user:
         print("Erro: Usuário não autenticado em /api/funcionarios/<id>")
         return jsonify({'error': 'Não autorizado'}), 401
+
+    # Gerar chave de cache para GET
+    if request.method == 'GET':
+        cache_key = f"funcionario:{user['id']}:{id}"
+        cached_data = redis_client.get(cache_key)
+        if cached_data:
+            print(f"Cache hit para funcionario: {cache_key}, tamanho: {len(cached_data)} bytes")
+            return jsonify(json.loads(cached_data))
 
     if request.method == 'GET':
         try:
@@ -550,6 +682,8 @@ def manage_funcionario(id):
                 'logs': formatted_logs
             }
 
+            # Armazenar no cache por 5 minutos
+            redis_client.setex(cache_key, 300, json.dumps(result))
             return jsonify(result)
         except Exception as e:
             print(f"Erro em get_funcionario_details: {str(e)}")
@@ -655,11 +789,22 @@ def get_polos():
     if not user:
         print("Erro: Usuário não autenticado em /api/polos")
         return jsonify({'error': 'Não autorizado'}), 401
+
+    # Gerar chave de cache
+    cache_key = f"polos:{user['id']}"
+    cached_data = redis_client.get(cache_key)
+    if cached_data:
+        print(f"Cache hit para polos: {cache_key}, tamanho: {len(cached_data)} bytes")
+        return jsonify(json.loads(cached_data))
+
     try:
         polos = execute_supabase_query(
             supabase.table('polos').select('id, nome')
         )
         result = [{'id': polo['id'], 'nome': polo['nome']} for polo in polos]
+
+        # Armazenar no cache por 5 minutos
+        redis_client.setex(cache_key, 300, json.dumps(result))
         return jsonify(result)
     except Exception as e:
         print(f"Erro em get_polos: {str(e)}")
@@ -671,6 +816,15 @@ def manage_alunos():
     if not user:
         print("Erro: Usuário não autenticado em /api/alunos")
         return jsonify({'error': 'Não autorizado'}), 401
+
+    # Gerar chave de cache
+    params = request.args.to_dict()
+    cache_key = f"alunos:{user['id']}:{json.dumps(params, sort_keys=True)}"
+    cached_data = redis_client.get(cache_key)
+    if cached_data:
+        print(f"Cache hit para alunos: {cache_key}, tamanho: {len(cached_data)} bytes")
+        return jsonify(json.loads(cached_data))
+
     try:
         count_only = request.args.get('count_only', 'false').lower() == 'true'
 
@@ -707,8 +861,6 @@ def manage_alunos():
             base_query = base_query.ilike('unidade', f'%{unidade}%')
         if etapa and etapa.lower() != 'tudo':
             base_query = base_query.eq('etapa', etapa)
-        if status and status.lower() != 'tudo':
-            pass
 
         if count_only:
             total_response = base_query.execute()
@@ -756,6 +908,7 @@ def manage_alunos():
             matriculas = aluno.get('matriculas', [])
             dias_matriculados = {}
             cognitive_count = motor_count = 0
+            total_matriculas = len(matriculas)
             for m in matriculas:
                 dia = m['turmas']['dia_semana']
                 tipo = m['turmas']['disciplinas']['tipo']
@@ -769,13 +922,15 @@ def manage_alunos():
                     motor_count += 1
 
             dias_completos = sum(1 for dia, counts in dias_matriculados.items() if counts['cognitiva'] >= 1 and counts['motora'] >= 1)
-            status = 'pending'
-            if dias_completos == 2:
-                status = 'complete'
-            elif dias_completos == 1:
-                status = 'partial'
+            aluno_status = 'sem_matriculas'
+            if total_matriculas == 4 and dias_completos == 2 and cognitive_count == 2 and motor_count == 2:
+                aluno_status = 'complete'
+            elif dias_completos >= 1:
+                aluno_status = 'partial'
+            elif cognitive_count > 0 or motor_count > 0:
+                aluno_status = 'pending'
 
-            if status.lower() != 'tudo' and status != status.lower():
+            if status and status.lower() != 'tudo' and aluno_status != status.lower():
                 continue
 
             result.append({
@@ -790,14 +945,18 @@ def manage_alunos():
                 'etapa': aluno['etapa'],
                 'turno': aluno['turno'],
                 'data_nascimento': aluno['data_nascimento'],
-                'status': status
+                'status': aluno_status
             })
-        return jsonify({
+
+        # Armazenar no cache por 5 minutos
+        response_data = {
             'data': result,
             'total_pages': total_pages,
             'current_page': 1,
             'total_alunos': len(result)
-        })
+        }
+        redis_client.setex(cache_key, 300, json.dumps(response_data))
+        return jsonify(response_data)
     except Exception as e:
         print(f"Erro em get_alunos: {str(e)}")
         return jsonify({'error': str(e)}), 500
@@ -808,6 +967,14 @@ def get_alunos_polo_count():
     if not user:
         print("Erro: Usuário não autenticado em /api/alunos/polo_count")
         return jsonify({'error': 'Não autorizado'}), 401
+
+    # Gerar chave de cache
+    cache_key = f"alunos_polo_count:{user['id']}"
+    cached_data = redis_client.get(cache_key)
+    if cached_data:
+        print(f"Cache hit para alunos_polo_count: {cache_key}, tamanho: {len(cached_data)} bytes")
+        return jsonify(json.loads(cached_data))
+
     try:
         if 'polo_id' not in user or not user['polo_id']:
             print("Erro: Usuário não tem polo_id associado")
@@ -817,7 +984,11 @@ def get_alunos_polo_count():
         response = base_query.execute()
         total_alunos_polo = response.count
 
-        return jsonify({'total_alunos_polo': total_alunos_polo})
+        result = {'total_alunos_polo': total_alunos_polo}
+
+        # Armazenar no cache por 5 minutos
+        redis_client.setex(cache_key, 300, json.dumps(result))
+        return jsonify(result)
     except Exception as e:
         print(f"Erro em get_alunos_polo_count: {str(e)}")
         return jsonify({'error': str(e)}), 500
@@ -925,6 +1096,15 @@ def manage_alunos_paginados():
     if not user:
         print("Erro: Usuário não autenticado em /api/alunos_paginados")
         return jsonify({'error': 'Não autorizado'}), 401
+
+    # Gerar chave de cache
+    params = request.args.to_dict()
+    cache_key = f"alunos_paginados:{user['id']}:{json.dumps(params, sort_keys=True)}"
+    cached_data = redis_client.get(cache_key)
+    if cached_data:
+        print(f"Cache hit para alunos_paginados: {cache_key}, tamanho: {len(cached_data)} bytes")
+        return jsonify(json.loads(cached_data))
+
     try:
         count_only = request.args.get('count_only', 'false').lower() == 'true'
         page = int(request.args.get('page', 1))
@@ -940,42 +1120,85 @@ def manage_alunos_paginados():
         etapa = request.args.get('etapa', '').strip()
         status = request.args.get('status', '').strip()
 
+        print(f"Filtro turma_unidade recebido (usando como unidade): {turma_unidade}")
+
+        # Mapear os valores de polo_name para os valores esperados no banco de dados
+        polo_name_mapping = {
+            'POLO Bacaxá': 'POLO I (Bacaxá)',
+            'POLO Sampaio Correia': 'POLO II (Sampaio Correia)',
+            'POLO Jaconé': 'POLO III (Jaconé)',
+            'POLO Saquarema': 'POLO IV (Saquarema)'
+        }
+        if polo_name in polo_name_mapping:
+            polo_name = polo_name_mapping[polo_name]
+            print(f"Mapeado polo_name de {request.args.get('polo_name')} para {polo_name}")
+
         if etapa and etapa.lower() != 'tudo':
             etapa = f"{etapa}º Ano"
 
+        # Query para contar os alunos
         base_query = supabase.table('alunos').select('id', count='exact')
 
-        if user['cargo'] in ['diretor', 'monitor']:
-            if user.get('unidade'):
-                base_query = base_query.eq('unidade', user['unidade'])
-            else:
-                return jsonify({
-                    'data': [],
-                    'total_pages': 1,
-                    'current_page': 1,
-                    'total_alunos': 0
-                })
-        elif user['cargo'] == 'coordenador':
-            if user.get('polo_id'):
-                base_query = base_query.eq('polo_id', user['polo_id'])
-            else:
-                return jsonify({
-                    'data': [],
-                    'total_pages': 1,
-                    'current_page': 1,
-                    'total_alunos': 0
-                })
+        print(f"Cargo do usuário: {user['cargo']}")
+
+        # Aplicar filtros por cargo apenas para cargos relevantes
+        unidades_do_polo = []
+        if user['cargo'] in ['coordenador', 'diretor', 'monitor']:
+            if user['cargo'] == 'coordenador' and user.get('polo_id'):
+                polo_query = supabase.table('polos').select('unidades, nome').eq('id', user['polo_id']).single()
+                polo_data = execute_supabase_query(polo_query)
+                if polo_data and 'unidades' in polo_data and polo_data['unidades']:
+                    unidades_do_polo = [unidade for unidade in polo_data['unidades'] if isinstance(unidade, str)]
+                    print(f"Unidades associadas ao polo {user['polo_id']} ({polo_data['nome']}): {unidades_do_polo}")
+                else:
+                    print(f"Nenhuma unidade encontrada para o polo {user['polo_id']}")
+                    unidades_do_polo = []
+
+            if user['cargo'] in ['diretor', 'monitor']:
+                if user.get('unidade'):
+                    base_query = base_query.eq('unidade', user['unidade'])
+                    print(f"Filtro por unidade (diretor/monitor): {user['unidade']}")
+                else:
+                    print(f"Usuário {user['id']} ({user['cargo']}) não tem unidade associada")
+                    return jsonify({
+                        'data': [],
+                        'total_pages': 1,
+                        'current_page': 1,
+                        'total_alunos': 0
+                    })
+            elif user['cargo'] == 'coordenador':
+                if unidades_do_polo:
+                    base_query = base_query.in_('unidade', unidades_do_polo)
+                    print(f"Filtro por unidades (coordenador): {unidades_do_polo}")
+                else:
+                    print(f"Usuário {user['id']} ({user['cargo']}) não tem unidades associadas ao polo {user['polo_id']}")
+                    return jsonify({
+                        'data': [],
+                        'total_pages': 1,
+                        'current_page': 1,
+                        'total_alunos': 0
+                    })
 
         if nome:
             base_query = base_query.ilike('nome', f'%{nome}%')
         if matricula:
             base_query = base_query.ilike('matricula', f'%{matricula}%')
         if polo_name and polo_name.lower() != 'tudo':
-            base_query = base_query.eq('polo_id', (
-                supabase.table('polos').select('id').eq('nome', polo_name).execute().data[0]['id']
-            ))
+            polo_query = supabase.table('polos').select('id').ilike('nome', polo_name).execute()
+            if polo_query.data:
+                polo_id = polo_query.data[0]['id']
+                print(f"Polo encontrado: {polo_name}, ID: {polo_id}")
+                base_query = base_query.eq('polo_id', polo_id)
+            else:
+                print(f"Polo com nome {polo_name} não encontrado no banco de dados")
+                return jsonify({
+                    'data': [],
+                    'total_pages': 1,
+                    'current_page': 1,
+                    'total_alunos': 0
+                })
         if turma_unidade and turma_unidade.lower() != 'tudo':
-            base_query = base_query.ilike('turma_unidade', f'%{turma_unidade}%')
+            base_query = base_query.ilike('unidade', f'%{turma_unidade}%')
         if genero and genero.lower() != 'tudo':
             base_query = base_query.eq('genero', genero)
         if pcd and pcd.lower() != 'tudo':
@@ -985,46 +1208,51 @@ def manage_alunos_paginados():
         if etapa and etapa.lower() != 'tudo':
             base_query = base_query.eq('etapa', etapa)
 
+        # Log para depurar a query antes da execução
+        print(f"Query base_query após aplicar filtros: {base_query}")
+
         if count_only:
             total_response = base_query.execute()
             total_alunos = total_response.count
+            print(f"Total de alunos (count_only): {total_alunos}")
             return jsonify({'total_alunos': total_alunos})
 
+        # Executar a query para contar o total de alunos
+        total_response = base_query.execute()
+        total_alunos = total_response.count
+        print(f"Total de alunos encontrados antes do filtro de status: {total_alunos}")
+
+        # Log para verificar alguns registros retornados (apenas se polo_name != 'tudo')
+        if polo_name and polo_name.lower() != 'tudo':
+            count_query_with_data = supabase.table('alunos').select('id, nome, polo_id, unidade, etapa, turno').eq('polo_id', polo_id).limit(5).execute()
+            print(f"Primeiros 5 alunos para polo_id {polo_id}: {count_query_with_data.data}")
+
+        # Query principal para buscar os dados completos
         query = supabase.table('alunos').select(
-            'id, nome, matricula, polo_id, polos(nome), turma_unidade, genero, pcd, unidade, etapa, turno, data_nascimento, matriculas(turmas(disciplinas(tipo), dia_semana))'
+            'id, nome, matricula, polo_id, polos(nome), turma_unidade, genero, pcd, unidade, etapa, turno, data_nascimento, matriculas(turmas(disciplinas(tipo), dia_semana, nome, faixa_etaria, periodo, polos!turmas_polo_id_fkey(nome)))'
         )
 
+        # Aplicar os mesmos filtros por cargo na query principal
         if user['cargo'] in ['diretor', 'monitor']:
             if user.get('unidade'):
                 query = query.eq('unidade', user['unidade'])
-            else:
-                return jsonify({
-                    'data': [],
-                    'total_pages': 1,
-                    'current_page': 1,
-                    'total_alunos': 0
-                })
+                print(f"Filtro por unidade na query principal (diretor/monitor): {user['unidade']}")
         elif user['cargo'] == 'coordenador':
-            if user.get('polo_id'):
-                query = query.eq('polo_id', user['polo_id'])
-            else:
-                return jsonify({
-                    'data': [],
-                    'total_pages': 1,
-                    'current_page': 1,
-                    'total_alunos': 0
-                })
+            if unidades_do_polo:
+                query = query.in_('unidade', unidades_do_polo)
+                print(f"Filtro por unidades na query principal (coordenador): {unidades_do_polo}")
 
+        if polo_name and polo_name.lower() != 'tudo':
+            polo_query = supabase.table('polos').select('id').ilike('nome', polo_name).execute()
+            if polo_query.data:
+                polo_id = polo_query.data[0]['id']
+                query = query.eq('polo_id', polo_id)
         if nome:
             query = query.ilike('nome', f'%{nome}%')
         if matricula:
             query = query.ilike('matricula', f'%{matricula}%')
-        if polo_name and polo_name.lower() != 'tudo':
-            query = query.eq('polo_id', (
-                supabase.table('polos').select('id').eq('nome', polo_name).execute().data[0]['id']
-            ))
         if turma_unidade and turma_unidade.lower() != 'tudo':
-            query = query.ilike('turma_unidade', f'%{turma_unidade}%')
+            query = query.ilike('unidade', f'%{turma_unidade}%')
         if genero and genero.lower() != 'tudo':
             query = query.eq('genero', genero)
         if pcd and pcd.lower() != 'tudo':
@@ -1034,8 +1262,8 @@ def manage_alunos_paginados():
         if etapa and etapa.lower() != 'tudo':
             query = query.eq('etapa', etapa)
 
-        total_response = base_query.execute()
-        total_alunos = total_response.count
+        # Log para depurar a query principal
+        print(f"Query principal após aplicar filtros: {query}")
 
         batch_size = 1000
         alunos = []
@@ -1045,6 +1273,8 @@ def manage_alunos_paginados():
             batch_alunos = execute_supabase_query(batch_query)
             alunos.extend(batch_alunos)
 
+        print(f"Alunos retornados do Supabase (primeiros 5): {alunos[:5]}")
+
         total_pages = (total_alunos + per_page - 1) // per_page
 
         result = []
@@ -1052,6 +1282,7 @@ def manage_alunos_paginados():
             matriculas = aluno.get('matriculas', [])
             dias_matriculados = {}
             cognitive_count = motor_count = 0
+            total_matriculas = len(matriculas)
             for m in matriculas:
                 dia = m['turmas']['dia_semana']
                 tipo = m['turmas']['disciplinas']['tipo']
@@ -1065,41 +1296,68 @@ def manage_alunos_paginados():
                     motor_count += 1
 
             dias_completos = sum(1 for dia, counts in dias_matriculados.items() if counts['cognitiva'] >= 1 and counts['motora'] >= 1)
-            aluno_status = 'pending'
-            if dias_completos == 2:
+            aluno_status = 'sem_matriculas'
+            if total_matriculas == 4 and dias_completos == 2 and cognitive_count == 2 and motor_count == 2:
                 aluno_status = 'complete'
-            elif dias_completos == 1:
+            elif dias_completos >= 1:
                 aluno_status = 'partial'
+            elif cognitive_count > 0 or motor_count > 0:
+                aluno_status = 'pending'
+
+            print(f"Aluno {aluno['nome']}: total_matriculas={total_matriculas}, dias_completos={dias_completos}, cognitive_count={cognitive_count}, motor_count={motor_count}, status={aluno_status}, polo_id={aluno['polo_id']}")
 
             if status and status.lower() != 'tudo' and aluno_status != status.lower():
                 continue
+
+            # Preparar os dados das matrículas para o modal
+            enrollment_details = []
+            for m in matriculas:
+                turma = m['turmas']
+                polo = turma.get('polos', {}) if turma else {}
+                enrollment_details.append({
+                    'name': turma.get('nome', 'Não especificado'),
+                    'type': turma.get('disciplinas', {}).get('tipo', 'Desconhecido'),
+                    'grades': turma.get('faixa_etaria', []),
+                    'day': turma.get('dia_semana', 'Não especificado'),
+                    'period': turma.get('periodo', 'Não especificado'),
+                    'polo_name': polo.get('nome', 'Não especificado')
+                })
 
             aluno_data = {
                 'id': aluno['id'],
                 'name': aluno['nome'],
                 'matricula': aluno['matricula'],
-                'polo_name': aluno['polos']['nome'],
-                'turma_unidade': aluno['turma_unidade'],
+                'polo_name': aluno['polos']['nome'] if 'polos' in aluno else 'Não especificado',
+                'turma_unidade': aluno['turma_unidade'],  # Incluir o campo turma_unidade
                 'genero': aluno['genero'],
                 'pcd': aluno['pcd'],
                 'unidade': aluno['unidade'],
                 'etapa': aluno['etapa'],
                 'turno': aluno['turno'],
                 'data_nascimento': aluno['data_nascimento'],
-                'status': aluno_status
+                'status': aluno_status,
+                'enrollments': enrollment_details  # Adicionar os detalhes das matrículas
             }
             result.append(aluno_data)
+
+        print(f"Total de alunos após filtro de status: {len(result)}")
+        print(f"Exemplo de alunos após filtro (primeiros 5): {result[:5]}")
 
         start = (page - 1) * per_page
         end = min(start + per_page, len(result))
         paginated_result = result[start:end]
 
-        return jsonify({
+        response_data = {
             'data': paginated_result,
             'total_pages': total_pages,
             'current_page': page,
             'total_alunos': len(result)
-        })
+        }
+
+        print(f"Resultado final (primeiros 5): {paginated_result[:5]}")
+
+        redis_client.setex(cache_key, 300, json.dumps(response_data))
+        return jsonify(response_data)
     except Exception as e:
         print(f"Erro em get_alunos_paginados: {str(e)}")
         return jsonify({'error': str(e)}), 500
@@ -1110,7 +1368,15 @@ def get_turmas():
     if not user:
         print("Erro: Usuário não autenticado em /api/turmas")
         return jsonify({'error': 'Não autorizado'}), 401
-    
+
+    # Gerar chave de cache para GET
+    if request.method == 'GET':
+        cache_key = f"turmas:{user['id']}:{user['cargo']}"
+        cached_data = redis_client.get(cache_key)
+        if cached_data:
+            print(f"Cache hit para turmas: {cache_key}, tamanho: {len(cached_data)} bytes")
+            return jsonify(json.loads(cached_data))
+
     if request.method == 'GET':
         try:
             query = supabase.table('turmas').select(
@@ -1139,6 +1405,9 @@ def get_turmas():
                     'enrollmentCount': len(turma['matriculas']),
                     'polo_name': polo_name
                 })
+
+            # Armazenar no cache por 5 minutos
+            redis_client.setex(cache_key, 300, json.dumps(result))
             return jsonify(result)
         except Exception as e:
             print(f"Erro em get_turmas: {str(e)}")
@@ -1433,6 +1702,15 @@ def manage_matriculas():
     if not user:
         print("Erro: Usuário não autenticado em /api/matriculas")
         return jsonify({'error': 'Não autorizado'}), 401
+
+    # Gerar chave de cache para GET
+    if request.method == 'GET':
+        cache_key = f"matriculas:{user['id']}"
+        cached_data = redis_client.get(cache_key)
+        if cached_data:
+            print(f"Cache hit para matriculas: {cache_key}, tamanho: {len(cached_data)} bytes")
+            return jsonify(json.loads(cached_data))
+
     if request.method == 'GET':
         try:
             matriculas = execute_supabase_query(
@@ -1459,6 +1737,9 @@ def manage_matriculas():
                         'classId': matricula['turma_id'],
                         'required': False
                     })
+
+            # Armazenar no cache por 5 minutos
+            redis_client.setex(cache_key, 300, json.dumps(result))
             return jsonify(result)
         except Exception as e:
             print(f"Erro em manage_matriculas GET: {str(e)}")
@@ -1569,12 +1850,18 @@ def get_logs():
         print("Erro: Usuário não tem permissão para acessar os logs")
         return jsonify({'error': 'Proibido: Apenas admin ou secretaria podem acessar os logs'}), 403
 
+    # Gerar chave de cache
+    user_id = request.args.get('user_id', '').strip()
+    action_type = request.args.get('action_type', '').strip()
+    entity_type = request.args.get('entity_type', '').strip()
+    cache_key = f"logs:{user['id']}:{user_id}:{action_type}:{entity_type}"
+    cached_data = redis_client.get(cache_key)
+    if cached_data:
+        print(f"Cache hit para logs: {cache_key}, tamanho: {len(cached_data)} bytes")
+        return jsonify(json.loads(cached_data))
+
     try:
         query = supabase.table('logs').select('*, funcionarios(nome, cargo)').order('created_at', desc=True)
-
-        user_id = request.args.get('user_id', '').strip()
-        action_type = request.args.get('action_type', '').strip()
-        entity_type = request.args.get('entity_type', '').strip()
 
         if user_id:
             query = query.eq('user_id', user_id)
@@ -1610,6 +1897,9 @@ def get_logs():
                 'details': log['details'],
                 'created_at': created_at
             })
+
+        # Armazenar no cache por 5 minutos
+        redis_client.setex(cache_key, 300, json.dumps(result))
         return jsonify(result)
     except Exception as e:
         print(f"Erro em get_logs: {str(e)}")
@@ -1621,11 +1911,22 @@ def get_disciplinas():
     if not user:
         print("Erro: Usuário não autenticado em /api/disciplinas")
         return jsonify({'error': 'Não autorizado'}), 401
+
+    # Gerar chave de cache
+    cache_key = f"disciplinas:{user['id']}"
+    cached_data = redis_client.get(cache_key)
+    if cached_data:
+        print(f"Cache hit para disciplinas: {cache_key}, tamanho: {len(cached_data)} bytes")
+        return jsonify(json.loads(cached_data))
+
     try:
         disciplinas = execute_supabase_query(
             supabase.table('disciplinas').select('id, nome, tipo')
         )
         result = [{'id': disciplina['id'], 'nome': disciplina['nome'], 'tipo': disciplina['tipo']} for disciplina in disciplinas]
+
+        # Armazenar no cache por 5 minutos
+        redis_client.setex(cache_key, 300, json.dumps(result))
         return jsonify(result)
     except Exception as e:
         print(f"Erro em get_disciplinas: {str(e)}")
@@ -1636,10 +1937,23 @@ def busca_ativa():
     user = get_current_user()
     if not user:
         return jsonify({'error': 'Não autorizado'}), 401
+
+    # Gerar chave de cache para GET
+    if request.method == 'GET':
+        cache_key = f"busca_ativa:{user['id']}"
+        cached_data = redis_client.get(cache_key)
+        if cached_data:
+            print(f"Cache hit para busca_ativa: {cache_key}, tamanho: {len(cached_data)} bytes")
+            return jsonify(json.loads(cached_data))
+
     try:
         if request.method == 'GET':
             response = supabase.table('busca_ativa').select('*').execute()
-            return jsonify(response.data)
+            result = response.data
+
+            # Armazenar no cache por 5 minutos
+            redis_client.setex(cache_key, 300, json.dumps(result))
+            return jsonify(result)
         elif request.method == 'POST':
             data = request.json
             required_fields = ['id_aluno', 'funcionario_id', 'resultado', 'sucesso']
@@ -1660,7 +1974,9 @@ def get_dashboard_data():
         print("Erro: Usuário não autenticado em /api/dashboard_data")
         return jsonify({'error': 'Não autorizado'}), 401
 
-    cache_key = f"dashboard_data:{user['id']}:{user['cargo']}"
+    # Incluir o polo_id e o parâmetro apply_unit_filter na chave de cache
+    apply_unit_filter = request.args.get('apply_unit_filter', 'true').lower() == 'true'
+    cache_key = f"dashboard_data:{user['id']}:{user['cargo']}:{user.get('polo_id', 'no_polo')}:{apply_unit_filter}"
     cached_data = redis_client.get(cache_key)
     if cached_data:
         print(f"Cache hit para dashboard_data: {cache_key}, tamanho: {len(cached_data)} bytes")
@@ -1676,7 +1992,7 @@ def get_dashboard_data():
         turmas_ativas = {'current_period': current_period, 'current_day': current_weekday, 'turmas': []}
         if current_weekday:
             query = supabase.table('turmas').select(
-                'id, nome, disciplinas(tipo), periodo, capacidade, matriculas(id, aluno_id, alunos(nome)), polos!turmas_polo_id_fkey(nome)'
+                'id, nome, disciplinas(tipo), periodo, capacidade, matriculas(id, aluno_id, alunos(nome)), polos!turmas_polo_id_fkey(nome), faixa_etaria, dia_semana'
             ).eq('periodo', current_period).eq('dia_semana', current_weekday).limit(50)
             if user['cargo'] in ['admin', 'secretaria']:
                 turmas = execute_supabase_query(query)
@@ -1700,7 +2016,8 @@ def get_dashboard_data():
                     'subject': 'Cognitiva' if turma.get('disciplinas', {}).get('tipo') == 'cognitiva' else 'Motora',
                     'type': turma.get('disciplinas', {}).get('tipo', 'Desconhecido'),
                     'period': turma['periodo'], 'capacity': turma['capacidade'],
-                    'enrollmentCount': enrollment_count, 'polo_name': polo_name, 'students': alunos
+                    'enrollmentCount': enrollment_count, 'polo_name': polo_name, 'students': alunos,
+                    'day': turma['dia_semana'], 'grades': turma['faixa_etaria']
                 })
 
         query = supabase.table('turmas').select(
@@ -1727,21 +2044,70 @@ def get_dashboard_data():
                 'polo_name': polo_name
             })
 
+        # Obter todas as unidades associadas ao polo do funcionário diretamente da tabela polos
+        unidades_do_polo = []
+        unidades_do_polo_normalizadas = []
+        if user['cargo'] in ['diretor', 'coordenador', 'monitor'] and user.get('polo_id'):
+            # Consultar o array de unidades na tabela polos
+            polo_query = supabase.table('polos').select('unidades, nome').eq('id', user['polo_id']).single()
+            polo_data = execute_supabase_query(polo_query)
+            if polo_data and 'unidades' in polo_data and polo_data['unidades']:
+                # Normalizar as unidades do polo (remover espaços extras, converter para minúsculas, remover acentos)
+                unidades_do_polo = [unidade for unidade in polo_data['unidades'] if isinstance(unidade, str)]
+                unidades_do_polo_normalizadas = [
+                    unidecode(unidade.strip().lower()) for unidade in unidades_do_polo
+                ]
+                print(f"Unidades associadas ao polo {user['polo_id']} ({polo_data['nome']}): {unidades_do_polo}")
+                print(f"Unidades normalizadas do polo: {unidades_do_polo_normalizadas}")
+            else:
+                print(f"Nenhuma unidade encontrada para o polo {user['polo_id']}")
+                unidades_do_polo = []
+                unidades_do_polo_normalizadas = []
+
+        # Obter todos os alunos
         base_query = supabase.table('alunos').select('id', count='exact')
+        if user['cargo'] in ['diretor', 'coordenador', 'monitor'] and user.get('polo_id'):
+            base_query = base_query.eq('polo_id', user['polo_id'])
         total_response = base_query.execute()
         total_alunos = total_response.count
+        print(f"Total de alunos antes do filtro: {total_alunos}")
+
         batch_size = 1000
         alunos = []
         query = supabase.table('alunos').select(
-            'id, nome, matricula, polo_id, polos(nome), turma_unidade, genero, pcd, unidade, etapa, turno, data_nascimento, matriculas(turmas(disciplinas(tipo), dia_semana))'
+            'id, nome, matricula, turma_unidade, genero, pcd, unidade, etapa, turno, data_nascimento, matriculas(turmas(disciplinas(tipo), dia_semana)), polo_id, polos(nome)'
         )
+        if user['cargo'] in ['diretor', 'coordenador', 'monitor'] and user.get('polo_id'):
+            query = query.eq('polo_id', user['polo_id'])
         for start in range(0, total_alunos, batch_size):
             end = min(start + batch_size - 1, total_alunos - 1)
             batch_query = query.range(start, end)
             batch_alunos = execute_supabase_query(batch_query)
             alunos.extend(batch_alunos)
-        alunos_data = {'data': [], 'total_pages': 1, 'current_page': 1, 'total_alunos': len(alunos)}
-        for aluno in alunos:
+
+        # Filtrar alunos por unidades do polo apenas se apply_unit_filter for True
+        alunos_filtrados = alunos
+        if apply_unit_filter and user['cargo'] in ['diretor', 'coordenador', 'monitor'] and unidades_do_polo_normalizadas:
+            # Normalizar a unidade do aluno para comparação
+            alunos_filtrados = [
+                aluno for aluno in alunos 
+                if aluno['unidade'] and isinstance(aluno['unidade'], str) 
+                and unidecode(aluno['unidade'].strip().lower()) in unidades_do_polo_normalizadas
+            ]
+            print(f"Total de alunos após filtro por unidades do polo: {len(alunos_filtrados)}")
+            print(f"Exemplo de alunos filtrados (primeiros 5): {[{k: v for k, v in aluno.items() if k in ['id', 'nome', 'unidade']} for aluno in alunos_filtrados[:5]]}")
+            # Alunos não filtrados (para depuração)
+            alunos_nao_filtrados = [
+                aluno for aluno in alunos 
+                if not (aluno['unidade'] and isinstance(aluno['unidade'], str) 
+                        and unidecode(aluno['unidade'].strip().lower()) in unidades_do_polo_normalizadas)
+            ]
+            print(f"Total de alunos NÃO filtrados: {len(alunos_nao_filtrados)}")
+            print(f"Exemplo de alunos NÃO filtrados (primeiros 5): {[{k: v for k, v in aluno.items() if k in ['id', 'nome', 'unidade']} for aluno in alunos_nao_filtrados[:5]]}")
+            print(f"Unidades dos alunos NÃO filtrados (primeiros 5, normalizadas): {[unidecode(aluno['unidade'].strip().lower()) if aluno['unidade'] and isinstance(aluno['unidade'], str) else None for aluno in alunos_nao_filtrados[:5]]}")
+
+        alunos_data = {'data': [], 'total_pages': 1, 'current_page': 1, 'total_alunos': len(alunos_filtrados)}
+        for aluno in alunos_filtrados:
             matriculas = aluno.get('matriculas', [])
             dias_matriculados = {}
             cognitive_count = motor_count = 0
@@ -1764,10 +2130,11 @@ def get_dashboard_data():
                 status = 'partial'
             alunos_data['data'].append({
                 'id': aluno['id'], 'name': aluno['nome'], 'matricula': aluno['matricula'],
-                'polo_name': aluno['polos']['nome'], 'turma_unidade': aluno['turma_unidade'],
+                'turma_unidade': aluno['turma_unidade'],
                 'genero': aluno['genero'], 'pcd': aluno['pcd'], 'unidade': aluno['unidade'],
                 'etapa': aluno['etapa'], 'turno': aluno['turno'], 'data_nascimento': aluno['data_nascimento'],
-                'status': status
+                'status': status,
+                'polo_name': aluno['polos']['nome'] if 'polos' in aluno else 'Não especificado'
             })
 
         matriculas = execute_supabase_query(
@@ -1791,11 +2158,11 @@ def get_dashboard_data():
                     'classId': matricula['turma_id'], 'required': False
                 })
 
+        # Simplificar o cálculo de polo_count usando len(alunos_filtrados)
         polo_count = 0
         if user['cargo'] in ['diretor', 'coordenador', 'monitor'] and user.get('polo_id'):
-            base_query = supabase.table('alunos').select('id', count='exact').eq('polo_id', user['polo_id'])
-            response = base_query.execute()
-            polo_count = response.count
+            polo_count = len([aluno for aluno in alunos if aluno['polo_id'] == user['polo_id']])
+            print(f"Total de alunos no polo {user['polo_id']}: {polo_count}")
 
         response_data = {
             'alunos': alunos_data,
@@ -1810,6 +2177,6 @@ def get_dashboard_data():
     except Exception as e:
         print(f"Erro em get_dashboard_data: {str(e)}")
         return jsonify({'error': 'Erro interno ao buscar dados do dashboard'}), 500
-
+    
 if __name__ == '__main__':
     app.run(host='0.0.0.0', port=5000, debug=False)

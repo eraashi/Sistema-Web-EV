@@ -31,10 +31,10 @@
                     <label for="polo_name" class="block text-sm font-medium text-gray-700">Polo</label>
                     <select id="polo_name" name="polo_name" class="mt-1 block w-full px-3 py-2 border border-gray-300 rounded-md shadow-sm focus:outline-none focus:ring-blue-500 focus:border-blue-500">
                         <option value="tudo">Tudo</option>
-                        <option value="POLO I (Porto da Roça)">POLO I (Porto da Roça)</option>
-                        <option value="POLO II (Sampaio Correia)">POLO II (Sampaio Correia)</option>
-                        <option value="Polo III (Jaconé)">Polo III (Jaconé)</option>
-                        <option value="Polo IV (Saquarema)">Polo IV (Saquarema)</option>
+                        <option value="POLO Bacaxá">POLO Bacaxá</option>
+                        <option value="POLO Sampaio Correia">POLO Sampaio Correia</option>
+                        <option value="POLO Jaconé">POLO Jaconé</option>
+                        <option value="POLO Saquarema">POLO Saquarema</option>
                     </select>
                 </div>
             {% endif %}
@@ -43,46 +43,58 @@
                     <label for="turma_unidade" class="block text-sm font-medium text-gray-700">Unidade</label>
                     <select id="turma_unidade" name="turma_unidade" class="mt-1 block w-full px-3 py-2 border border-gray-300 rounded-md shadow-sm focus:outline-none focus:ring-blue-500 focus:border-blue-500">
                         <option value="tudo">Tudo</option>
-                        <optgroup label="POLO IV (Saquarema)">
-                            <option value="E.M. ORGÉ FERREIRA DOS SANTOS">E.M. ORGÉ FERREIRA DOS SANTOS</option>
-                            <option value="C.M. GUSTAVO CAMPOS DA SILVEIRA">C.M. GUSTAVO CAMPOS DA SILVEIRA</option>
-                            <option value="E.M. JOSÉ BANDEIRA">E.M. JOSÉ BANDEIRA</option>
-                            <option value="E.M. PROFESSORA OSÍRIS PALMIER DA VEIGA">E.M. PROFESSORA OSÍRIS PALMIER DA VEIGA</option>
-                            <option value="E.M. PROFESSORA MARIA DE LOURDES MELO PAES BARRETO">E.M. PROFESSORA MARIA DE LOURDES MELO PAES BARRETO</option>
-                            <option value="E.M. BELINO CATHARINO DE SOUZA">E.M. BELINO CATHARINO DE SOUZA</option>
-                        </optgroup>
-                        <optgroup label="POLO I (Porto da Roça)">
-                            <option value="E.M. ANÍZIA ROSA DE OLIVEIRA COUTINHO">E.M. ANÍZIA ROSA DE OLIVEIRA COUTINHO</option>
-                            <option value="E.M. LUCIANA SANTANA COUTINHO">E.M. LUCIANA SANTANA COUTINHO</option>
-                            <option value="E.M. RUBENS DE LIMA CAMPOS">E.M. RUBENS DE LIMA CAMPOS</option>
-                            <option value="E.M. VALTEMIR JOSÉ DA COSTA">E.M. VALTEMIR JOSÉ DA COSTA</option>
-                            <option value="E.M. JOÃO MACHADO DA CUNHA">E.M. JOÃO MACHADO DA CUNHA</option>
-                            <option value="E.M. JARDIM IPITANGAS">E.M. JARDIM IPITANGAS</option>
-                            <option value="E.M. LÚCIO NUNES">E.M. LÚCIO NUNES</option>
-                            <option value="E.M. MANOEL MUNIZ DA SILVA">E.M. MANOEL MUNIZ DA SILVA</option>
-                            <option value="E.M. MARGARIDA ROSA DE AMORIM">E.M. MARGARIDA ROSA DE AMORIM</option>
-                            <option value="E.M. ELCIRA DE OLIVEIRA COUTINHO">E.M. ELCIRA DE OLIVEIRA COUTINHO</option>
-                            <option value="E.M. BEATRIZ AMARAL">E.M. BEATRIZ AMARAL</option>
-                            <option value="C.M.E. MENALDO CARLOS DE MAGALHÃES">C.M.E. MENALDO CARLOS DE MAGALHÃES</option>
-                            <option value="C.M.E. PADRE MANUEL">C.M.E. PADRE MANUEL</option>
-                            <option value="E.M. PROFESSOR FRANCISCO VIGNOLI">E.M. PROFESSOR FRANCISCO VIGNOLI</option>
-                            <option value="E.M. PAULO LUIZ BARROSO OLIVEIRA">E.M. PAULO LUIZ BARROSO OLIVEIRA</option>
-                            <option value="E.M. PREFEITO WALQUIDES DE SOUZA LIMA">E.M. PREFEITO WALQUIDES DE SOUZA LIMA</option>
-                            <option value="E.M. VILATUR">E.M. VILATUR</option>
-                            <option value="E.M. THEÓFILO D'ÁVILA">E.M. THEÓFILO D'ÁVILA</option>
-                        </optgroup>
-                        <optgroup label="POLO III (Jaconé)">
-                            <option value="E.M. ISMÊNIA DE BARROS BARROSO">E.M. ISMÊNIA DE BARROS BARROSO</option>
-                        </optgroup>
-                        <optgroup label="POLO II (Sampaio Correia)">
-                            <option value="E.M. EDILSON VIGNOLI MARINS">E.M. EDILSON VIGNOLI MARINS</option>
-                            <option value="E.M. MARIA LUIZA DE AMORIM MENDONÇA">E.M. MARIA LUIZA DE AMORIM MENDONÇA</option>
-                            <option value="E.M. JOÃO LAUREANO DA SILVA">E.M. JOÃO LAUREANO DA SILVA</option>
-                            <option value="C.M.E. JURANDIR DA SILVA MELO">C.M.E. JURANDIR DA SILVA MELO</option>
-                            <option value="E.M. SEBASTIÃO MANOEL DOS REIS">E.M. SEBASTIÃO MANOEL DOS REIS</option>
-                            <option value="E.M. VEREADOR IVAN DA SILVA MELO">E.M. VEREADOR IVAN DA SILVA MELO</option>
-                            <option value="E.M. EDILÊNIO SILVA DE SOUZA">E.M. EDILÊNIO SILVA DE SOUZA</option>
-                        </optgroup>
+                        {% if user.cargo in ['admin', 'secretaria'] %}
+                            <!-- Para admin e secretaria, exibir todas as unidades -->
+                            <optgroup label="POLO Saquarema">
+                                <option value="E.M. ORGÉ FERREIRA DOS SANTOS">E.M. ORGÉ FERREIRA DOS SANTOS</option>
+                                <option value="C.M. GUSTAVO CAMPOS DA SILVEIRA">C.M. GUSTAVO CAMPOS DA SILVEIRA</option>
+                                <option value="E.M. JOSÉ BANDEIRA">E.M. JOSÉ BANDEIRA</option>
+                                <option value="E.M. PROFESSORA OSÍRIS PALMIER DA VEIGA">E.M. PROFESSORA OSÍRIS PALMIER DA VEIGA</option>
+                                <option value="E.M. PROFESSORA MARIA DE LOURDES MELO PAES BARRETO">E.M. PROFESSORA MARIA DE LOURDES MELO PAES BARRETO</option>
+                                <option value="E.M. BELINO CATHARINO DE SOUZA">E.M. BELINO CATHARINO DE SOUZA</option>
+                            </optgroup>
+                            <optgroup label="POLO Bacaxá">
+                                <option value="E.M. ANÍZIA ROSA DE OLIVEIRA COUTINHO">E.M. ANÍZIA ROSA DE OLIVEIRA COUTINHO</option>
+                                <option value="E.M. LUCIANA SANTANA COUTINHO">E.M. LUCIANA SANTANA COUTINHO</option>
+                                <option value="E.M. RUBENS DE LIMA CAMPOS">E.M. RUBENS DE LIMA CAMPOS</option>
+                                <option value="E.M. VALTEMIR JOSÉ DA COSTA">E.M. VALTEMIR JOSÉ DA COSTA</option>
+                                <option value="E.M. JOÃO MACHADO DA CUNHA">E.M. JOÃO MACHADO DA CUNHA</option>
+                                <option value="E.M. JARDIM IPITANGAS">E.M. JARDIM IPITANGAS</option>
+                                <option value="E.M. LÚCIO NUNES">E.M. LÚCIO NUNES</option>
+                                <option value="E.M. MANOEL MUNIZ DA SILVA">E.M. MANOEL MUNIZ DA SILVA</option>
+                                <option value="E.M. MARGARIDA ROSA DE AMORIM">E.M. MARGARIDA ROSA DE AMORIM</option>
+                                <option value="E.M. ELCIRA DE OLIVEIRA COUTINHO">E.M. ELCIRA DE OLIVEIRA COUTINHO</option>
+                                <option value="E.M. BEATRIZ AMARAL">E.M. BEATRIZ AMARAL</option>
+                                <option value="C.M.E. MENALDO CARLOS DE MAGALHÃES">C.M.E. MENALDO CARLOS DE MAGALHÃES</option>
+                                <option value="C.M.E. PADRE MANUEL">C.M.E. PADRE MANUEL</option>
+                                <option value="E.M. PROFESSOR FRANCISCO VIGNOLI">E.M. PROFESSOR FRANCISCO VIGNOLI</option>
+                                <option value="E.M. PAULO LUIZ BARROSO OLIVEIRA">E.M. PAULO LUIZ BARROSO OLIVEIRA</option>
+                                <option value="E.M. PREFEITO WALQUIDES DE SOUZA LIMA">E.M. PREFEITO WALQUIDES DE SOUZA LIMA</option>
+                                <option value="E.M. VILATUR">E.M. VILATUR</option>
+                                <option value="E.M. THEÓFILO D'ÁVILA">E.M. THEÓFILO D'ÁVILA</option>
+                            </optgroup>
+                            <optgroup label="POLO Jaconé">
+                                <option value="E.M. ISMÊNIA DE BARROS BARROSO">E.M. ISMÊNIA DE BARROS BARROSO</option>
+                            </optgroup>
+                            <optgroup label="POLO Sampaio Correia">
+                                <option value="E.M. EDILSON VIGNOLI MARINS">E.M. EDILSON VIGNOLI MARINS</option>
+                                <option value="E.M. MARIA LUIZA DE AMORIM MENDONÇA">E.M. MARIA LUIZA DE AMORIM MENDONÇA</option>
+                                <option value="E.M. JOÃO LAUREANO DA SILVA">E.M. JOÃO LAUREANO DA SILVA</option>
+                                <option value="C.M.E. JURANDIR DA SILVA MELO">C.M.E. JURANDIR DA SILVA MELO</option>
+                                <option value="E.M. SEBASTIÃO MANOEL DOS REIS">E.M. SEBASTIÃO MANOEL DOS REIS</option>
+                                <option value="E.M. VEREADOR IVAN DA SILVA MELO">E.M. VEREADOR IVAN DA SILVA MELO</option>
+                                <option value="E.M. EDILÊNIO SILVA DE SOUZA">E.M. EDILÊNIO SILVA DE SOUZA</option>
+                            </optgroup>
+                        {% else %}
+                            <!-- Para coordenadores, exibir apenas as unidades do polo do usuário -->
+                            {% if polo_data.unidades %}
+                                <optgroup label="{{ polo_data.nome }}">
+                                    {% for unidade in polo_data.unidades %}
+                                        <option value="{{ unidade }}">{{ unidade }}</option>
+                                    {% endfor %}
+                                </optgroup>
+                            {% endif %}
+                        {% endif %}
                     </select>
                 </div>
             {% endif %}
@@ -122,6 +134,7 @@
                     <option value="complete">Completo</option>
                     <option value="partial">Parcial</option>
                     <option value="pending">Pendente</option>
+                    <option value="sem_matriculas">Sem Matrículas</option>
                 </select>
             </div>
         </form>
@@ -140,14 +153,15 @@
             <thead class="bg-gray-50">
                 <tr>
                     <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">Nome</th>
+                    <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">Turma Unidade</th>
                     <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">Matrícula</th>
                     <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">Polo</th>
-                    <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">Turmas</th>
                     <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">Gênero</th>
                     <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">PCD</th>
                     <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">Unidade</th>
                     <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">Etapa</th>
                     <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">Enturmados Escola Viva</th>
+                    <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">Turmas Escola Viva</th>
                     {% if user.cargo in ['admin', 'secretaria', 'coordenador'] %}
                         <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">Ações</th>
                     {% endif %}
@@ -183,16 +197,16 @@
                 <div class="modal-field">
                     <label for="edit-polo-name" class="modal-label">Polo</label>
                     <select id="edit-polo-name" name="polo_name" class="modal-input">
-                        <option value="POLO I (Porto da Roça)">POLO I (Porto da Roça)</option>
-                        <option value="POLO II (Sampaio Correia)">POLO II (Sampaio Correia)</option>
-                        <option value="Polo III (Jaconé)">Polo III (Jaconé)</option>
-                        <option value="Polo IV (Saquarema)">Polo IV (Saquarema)</option>
+                        <option value="POLO Bacaxá">POLO Bacaxá</option>
+                        <option value="POLO Sampaio Correia">POLO Sampaio Correia</option>
+                        <option value="POLO Jaconé">POLO Jaconé</option>
+                        <option value="POLO Saquarema">POLO Saquarema</option>
                     </select>
                 </div>
                 <div class="modal-field">
                     <label for="edit-unidade" class="modal-label">Unidade</label>
                     <select id="edit-unidade" name="unidade" class="modal-input">
-                        <optgroup label="POLO IV (Saquarema)">
+                        <optgroup label="POLO Saquarema">
                             <option value="E.M. ORGÉ FERREIRA DOS SANTOS">E.M. ORGÉ FERREIRA DOS SANTOS</option>
                             <option value="C.M. GUSTAVO CAMPOS DA SILVEIRA">C.M. GUSTAVO CAMPOS DA SILVEIRA</option>
                             <option value="E.M. JOSÉ BANDEIRA">E.M. JOSÉ BANDEIRA</option>
@@ -200,7 +214,7 @@
                             <option value="E.M. PROFESSORA MARIA DE LOURDES MELO PAES BARRETO">E.M. PROFESSORA MARIA DE LOURDES MELO PAES BARRETO</option>
                             <option value="E.M. BELINO CATHARINO DE SOUZA">E.M. BELINO CATHARINO DE SOUZA</option>
                         </optgroup>
-                        <optgroup label="POLO I (Porto da Roça)">
+                        <optgroup label="POLO Bacaxá">
                             <option value="E.M. ANÍZIA ROSA DE OLIVEIRA COUTINHO">E.M. ANÍZIA ROSA DE OLIVEIRA COUTINHO</option>
                             <option value="E.M. LUCIANA SANTANA COUTINHO">E.M. LUCIANA SANTANA COUTINHO</option>
                             <option value="E.M. RUBENS DE LIMA CAMPOS">E.M. RUBENS DE LIMA CAMPOS</option>
@@ -220,10 +234,10 @@
                             <option value="E.M. VILATUR">E.M. VILATUR</option>
                             <option value="E.M. THEÓFILO D'ÁVILA">E.M. THEÓFILO D'ÁVILA</option>
                         </optgroup>
-                        <optgroup label="POLO III (Jaconé)">
+                        <optgroup label="POLO Jaconé">
                             <option value="E.M. ISMÊNIA DE BARROS BARROSO">E.M. ISMÊNIA DE BARROS BARROSO</option>
                         </optgroup>
-                        <optgroup label="POLO II (Sampaio Correia)">
+                        <optgroup label="POLO Sampaio Correia">
                             <option value="E.M. EDILSON VIGNOLI MARINS">E.M. EDILSON VIGNOLI MARINS</option>
                             <option value="E.M. MARIA LUIZA DE AMORIM MENDONÇA">E.M. MARIA LUIZA DE AMORIM MENDONÇA</option>
                             <option value="E.M. JOÃO LAUREANO DA SILVA">E.M. JOÃO LAUREANO DA SILVA</option>
@@ -281,6 +295,17 @@
         <div class="attention-box">
             <p class="attention-title"><strong>Atenção!</strong></p>
             <p class="attention-text">Após editar qualquer dado do aluno, será necessário realizar a matrícula dele novamente nas turmas do programa Escola Viva. Para isso, acesse: "Enturmar Alunos" nas opções do lado esquerdo.</p>
+        </div>
+    </div>
+</div>
+
+<!-- Modal para Visualizar Turmas -->
+<div id="view-classes-modal" class="modal">
+    <div class="modal-content">
+        <h2 class="modal-title">Turmas do Aluno</h2>
+        <div id="classes-list" class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4"></div>
+        <div class="modal-footer">
+            <button type="button" onclick="closeClassesModal()" class="modal-button modal-button-cancel">Fechar</button>
         </div>
     </div>
 </div>
@@ -496,6 +521,76 @@
     cursor: pointer !important;
     padding: 0 6px !important;
     flex-shrink: 0 !important;
+}
+
+.badge {
+    display: inline-flex;
+    padding: 0.25rem 0.5rem;
+    border-radius: 9999px;
+    font-size: 0.75rem;
+    font-weight: 500;
+    justify-content: center; /* Centraliza o texto */
+    text-align: center; /* Garante centralização em todos os casos */
+    min-width: 80px; /* Define uma largura mínima para consistência */
+}
+
+.badge-complete {
+    background-color: #D1FAE5;
+    color: #059669;
+}
+
+.badge-partial {
+    background-color: #FEF3C7;
+    color: #D97706;
+}
+
+.badge-pending {
+    background-color: #FEE2E2;
+    color: #EF4444;
+}
+
+.badge-sem-matriculas {
+    background-color: #c3c8d1; /* Cinza */
+    color: #ffffff;
+}
+
+/* Estilo do Card de Turma */
+.class-card {
+    background-color: #f9fafb;
+    border: 1px solid #e5e7eb;
+    border-radius: 8px;
+    padding: 16px;
+    box-shadow: 0 1px 3px rgba(0, 0, 0, 0.1);
+}
+
+.class-card h3 {
+    font-size: 1rem;
+    font-weight: 600;
+    margin-bottom: 8px;
+}
+
+.class-card p {
+    font-size: 0.875rem;
+    color: #4b5563;
+    margin-bottom: 4px;
+}
+
+.class-type-tag {
+    display: inline-block;
+    padding: 2px 8px;
+    border-radius: 12px;
+    font-size: 12px;
+    font-weight: 500;
+    margin-left: 8px;
+    color: white;
+}
+
+.class-type-tag.cognitiva {
+    background-color: #86efac;
+}
+
+.class-type-tag.motora {
+    background-color: #d8b4fe;
 }
 </style>
 {% endblock %}

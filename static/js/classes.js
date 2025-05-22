@@ -1,6 +1,12 @@
 (function () {
     let classes = [];
     let disciplinas = [];
+    let currentPage = 1;
+    const ITEMS_PER_PAGE = 20; // Renderizar 20 turmas por página
+    let totalPages = 1;
+    let filteredClasses = [];
+    let observer = null; // Variável global para o MutationObserver
+    let lastPaginationState = { currentPage: null, totalPages: null }; // Armazenar o último estado da paginação
 
     const retryFetch = async (url, options, retries = 2, delay = 500) => {
         const cacheKey = `cache_${url}`;
@@ -8,12 +14,22 @@
         if (cached) {
             try {
                 const { data, timestamp } = JSON.parse(cached);
-                if (Date.now() - timestamp < 10000 && data && Array.isArray(data)) {
+                console.log('Dados do cache local:', { 
+                    url, 
+                    data_length: data?.length || 0 
+                });
+                if (Date.now() - timestamp < 300000 && data && Array.isArray(data)) { // 5 minutos TTL (300.000 ms)
+                    console.log('Cache local válido usado:', { url, data_length: data.length });
                     return data;
                 } else {
+                    console.warn('Cache local inválido ou incompleto:', {
+                        timestamp_valid: Date.now() - timestamp < 300000,
+                        data_valid: data && Array.isArray(data)
+                    });
                     localStorage.removeItem(cacheKey);
                 }
             } catch (e) {
+                console.warn('Erro ao processar cache do localStorage:', e.message);
                 localStorage.removeItem(cacheKey);
             }
         }
@@ -22,17 +38,25 @@
             try {
                 const response = await fetch(url, options);
                 if (!response.ok) {
-                    throw new Error(`Erro HTTP! Status: ${response.status}`);
+                    throw new Error(`HTTP error! Status: ${response.status}`);
                 }
                 const data = await response.json();
                 try {
                     localStorage.setItem(cacheKey, JSON.stringify({ data, timestamp: Date.now() }));
-                } catch (e) {}
+                    console.log('Dados armazenados no cache local:', { 
+                        url, 
+                        data_length: data?.length || 0 
+                    });
+                } catch (e) {
+                    console.warn('Erro ao salvar no localStorage:', e.message);
+                }
                 return data;
             } catch (error) {
                 if (i < retries - 1) {
+                    console.warn(`Tentativa ${i + 1} falhou para ${url}: ${error}. Tentando novamente em ${delay}ms...`);
                     await new Promise(resolve => setTimeout(resolve, delay));
                 } else {
+                    console.error(`Falhou após ${retries} tentativas para ${url}: ${error}`);
                     throw error;
                 }
             }
@@ -40,79 +64,147 @@
     };
 
     async function fetchData() {
-        const overlay = document.createElement('div');
-        overlay.id = 'loading-overlay';
-        overlay.className = 'fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50';
-        overlay.innerHTML = '<div class="w-12 h-12 border-4 border-blue-600 border-t-transparent rounded-full animate-spin"></div>';
-        document.body.appendChild(overlay);
-
+        const overlay = document.getElementById('loading-overlay');
         const mainContent = document.querySelector('.mb-6');
-        if (mainContent) {
+
+        // Show overlay immediately
+        if (overlay && mainContent) {
+            overlay.classList.remove('hidden');
             mainContent.classList.add('pointer-events-none');
+            console.log('Loading overlay shown at start of fetchData');
+        } else {
+            console.warn('Overlay ou main-content não encontrados:', { overlay: !!overlay, mainContent: !!mainContent });
+        }
+
+        // Initialize Lucide icons early
+        if (typeof lucide !== 'undefined') {
+            lucide.createIcons();
+            console.log('Lucide icons inicializados no início do fetchData');
         }
 
         try {
             classes = [];
             disciplinas = [];
+            filteredClasses = [];
 
             let isRendered = false;
 
-            const cacheKeyDashboard = 'cache_/api/dashboard_data';
-            const cachedDashboard = localStorage.getItem(cacheKeyDashboard);
-            if (cachedDashboard) {
+            // Cache para turmas
+            const cacheKeyTurmas = 'cache_/api/turmas';
+            const cachedTurmas = localStorage.getItem(cacheKeyTurmas);
+            if (cachedTurmas) {
                 try {
-                    const { data, timestamp } = JSON.parse(cachedDashboard);
-                    if (Date.now() - timestamp < 10000 && data && Array.isArray(data.turmas) && data.turmas.length > 0) {
-                        classes = data.turmas;
+                    const { data, timestamp } = JSON.parse(cachedTurmas);
+                    console.log('Dados do cache local (turmas):', { 
+                        data_length: data?.length || 0 
+                    });
+                    if (Date.now() - timestamp < 300000 && data && Array.isArray(data)) {
+                        classes = data;
+                        filteredClasses = classes;
                         isRendered = true;
+                        // Adicionar pequeno atraso para garantir que o overlay seja visível
+                        await new Promise(resolve => setTimeout(resolve, 50));
                         renderClasses();
+                        // Aumentar o atraso para garantir que o DOM esteja pronto
+                        setTimeout(() => {
+                            updatePaginationWithRetry();
+                        }, 100);
+                        console.log('Renderizado a partir do cache de turmas:', classes.length, 'turmas');
                     } else {
-                        localStorage.removeItem(cacheKeyDashboard);
+                        console.warn('Cache de turmas inválido ou expirado, removendo');
+                        localStorage.removeItem(cacheKeyTurmas);
                     }
                 } catch (e) {
-                    localStorage.removeItem(cacheKeyDashboard);
+                    console.warn('Erro ao processar cache de turmas:', e.message);
+                    localStorage.removeItem(cacheKeyTurmas);
                 }
             }
 
+            // Cache para disciplinas
             const cacheKeyDisciplinas = 'cache_/api/disciplinas';
             const cachedDisciplinas = localStorage.getItem(cacheKeyDisciplinas);
             if (cachedDisciplinas) {
                 try {
                     const { data, timestamp } = JSON.parse(cachedDisciplinas);
-                    if (Date.now() - timestamp < 10000 && data && Array.isArray(data)) {
+                    console.log('Dados do cache local (disciplinas):', { 
+                        data_length: data?.length || 0 
+                    });
+                    if (Date.now() - timestamp < 300000 && data && Array.isArray(data)) {
                         disciplinas = data;
                         populateDisciplinaSelect();
+                        console.log('Disciplinas preenchidas a partir do cache:', disciplinas.length, 'itens');
                     } else {
+                        console.warn('Cache de disciplinas inválido ou expirado, removendo');
                         localStorage.removeItem(cacheKeyDisciplinas);
                     }
                 } catch (e) {
+                    console.warn('Erro ao processar cache de disciplinas:', e.message);
                     localStorage.removeItem(cacheKeyDisciplinas);
                 }
             }
 
-            const [dashboardData, disciplinasData] = await Promise.all([
-                retryFetch('/api/dashboard_data', { credentials: 'include' }),
+            // Se o cache foi usado para ambos os endpoints e renderizamos, podemos pular a busca de dados frescos
+            if (isRendered && disciplinas.length > 0) {
+                console.log('Cache válido usado para turmas e disciplinas, pulando busca de dados frescos');
+                return;
+            }
+
+            // Buscar dados frescos
+            console.log('Buscando dados frescos de /api/turmas e /api/disciplinas');
+            const [turmasData, disciplinasData] = await Promise.all([
+                retryFetch('/api/turmas', { credentials: 'include' }),
                 retryFetch('/api/disciplinas', { credentials: 'include' })
             ]);
 
-            classes = Array.isArray(dashboardData.turmas) ? dashboardData.turmas : [];
-            disciplinas = Array.isArray(disciplinasData) ? disciplinasData : [];
+            const newClasses = Array.isArray(turmasData) ? turmasData : [];
+            const newDisciplinas = Array.isArray(disciplinasData) ? disciplinasData : [];
 
-            if (!isRendered || classes.length > 0) {
+            console.log('Dados frescos obtidos:', { classes: newClasses.length, disciplinas: newDisciplinas.length });
+            console.log('Tipos de turmas encontradas:', [...new Set(newClasses.map(cls => cls.type))]);
+
+            const classesChanged = JSON.stringify(newClasses) !== JSON.stringify(classes);
+            const disciplinasChanged = JSON.stringify(newDisciplinas) !== JSON.stringify(disciplinas);
+
+            classes = newClasses;
+            disciplinas = newDisciplinas;
+            filteredClasses = classes;
+
+            if (!isRendered || classesChanged) {
                 renderClasses();
+                // Aumentar o atraso para garantir que o DOM esteja pronto
+                setTimeout(() => {
+                    updatePaginationWithRetry();
+                }, 100);
+                console.log('Turmas renderizadas com dados frescos');
+            } else {
+                console.log('Dados frescos idênticos ao cache, pulando renderização');
             }
-            populateDisciplinaSelect();
 
-            if (overlay && mainContent) {
-                overlay.remove();
-                mainContent.classList.remove('pointer-events-none');
+            if (disciplinasChanged) {
+                populateDisciplinaSelect();
+                console.log('Select de disciplinas atualizado com dados frescos');
             }
         } catch (error) {
+            console.error('Erro em fetchData:', error.message);
             showToast('Erro ao carregar dados: ' + error.message, 'error', 'alert-circle', 3000);
             renderClasses();
+            // Aumentar o atraso para garantir que o DOM esteja pronto
+            setTimeout(() => {
+                updatePaginationWithRetry();
+            }, 100);
+        } finally {
+            // Sempre ocultar o overlay
             if (overlay && mainContent) {
-                overlay.remove();
+                overlay.classList.add('hidden');
                 mainContent.classList.remove('pointer-events-none');
+                console.log('Overlay de carregamento ocultado');
+            } else {
+                console.warn('Overlay ou main-content não encontrados para ocultar:', { overlay: !!overlay, mainContent: !!mainContent });
+            }
+            // Reinicializar ícones Lucide para garantir ícones no menu e tabela
+            if (typeof lucide !== 'undefined') {
+                lucide.createIcons();
+                console.log('Ícones Lucide reinicializados após fetchData');
             }
         }
     }
@@ -126,20 +218,34 @@
             option.textContent = disciplina.nome.charAt(0).toUpperCase() + disciplina.nome.slice(1);
             select.appendChild(option);
         });
+        console.log('Select de disciplinas preenchido com', disciplinas.length, 'opções');
     }
 
     function filterClasses(type) {
-        const filtered = type ? classes.filter(cls => cls.type === type) : classes;
-        renderClasses(filtered);
+        filteredClasses = type ? classes.filter(cls => cls.type.toLowerCase() === type) : classes;
+        currentPage = 1; // Resetar para a primeira página ao filtrar
+        renderClasses();
+        // Aumentar o atraso para garantir que o DOM esteja pronto
+        setTimeout(() => {
+            updatePaginationWithRetry();
+        }, 100);
 
-        document.querySelectorAll('button').forEach(btn => {
-            btn.classList.remove('bg-blue-600', 'text-white');
-            btn.classList.add('bg-gray-200', 'text-gray-700', 'hover:bg-gray-300');
+        // Atualizar apenas os botões de filtro
+        const filterButtons = [document.getElementById('filter-cognitiva'), document.getElementById('filter-motora')];
+        filterButtons.forEach(btn => {
+            if (btn) {
+                btn.classList.remove('bg-blue-600', 'text-white');
+                btn.classList.add('bg-gray-200', 'text-gray-700', 'hover:bg-gray-300');
+            }
         });
         if (type) {
-            document.querySelector(`#filter-${type}`).classList.remove('bg-gray-200', 'text-gray-700', 'hover:bg-gray-300');
-            document.querySelector(`#filter-${type}`).classList.add('bg-blue-600', 'text-white', 'hover:bg-blue-700');
+            const activeButton = document.querySelector(`#filter-${type}`);
+            if (activeButton) {
+                activeButton.classList.remove('bg-gray-200', 'text-gray-700', 'hover:bg-gray-300');
+                activeButton.classList.add('bg-blue-600', 'text-white', 'hover:bg-blue-700');
+            }
         }
+        console.log('Turmas filtradas por tipo:', type || 'todas', filteredClasses.length, 'resultados');
     }
 
     function capitalizeFirstLetter(string) {
@@ -151,25 +257,43 @@
         return match ? match[0].trim() : name;
     }
 
-    function renderClasses(filteredClasses = classes) {
-        const tbody = document.getElementById('class-table-body');
-        tbody.innerHTML = '';
+    // Função para formatar o nome do polo visualmente
+    function formatPoloName(poloName) {
+        const mapping = {
+            'POLO I (Bacaxá)': 'POLO Bacaxá',
+            'POLO II (Sampaio Correia)': 'POLO Sampaio Correia',
+            'POLO III (Jaconé)': 'POLO Jaconé', // Ajustado para corresponder ao banco
+            'POLO IV (Saquarema)': 'POLO Saquarema' // Ajustado para corresponder ao banco
+        };
+        return mapping[poloName] || poloName;
+    }
 
-        if (filteredClasses.length === 0) {
+    function renderClasses() {
+        const tbody = document.getElementById('class-table-body');
+        const start = (currentPage - 1) * ITEMS_PER_PAGE;
+        const end = start + ITEMS_PER_PAGE;
+        const paginatedClasses = filteredClasses.slice(start, end);
+
+        // Calcular total de páginas
+        totalPages = Math.ceil(filteredClasses.length / ITEMS_PER_PAGE);
+
+        let html = '';
+        if (paginatedClasses.length === 0) {
             const colspan = currentUserRole === 'admin' || currentUserRole === 'secretaria' || currentUserRole === 'coordenador' ? 8 : 7;
-            tbody.innerHTML = `<tr><td colspan="${colspan}" class="px-6 py-4 text-center text-gray-500">Nenhuma turma encontrada.</td></tr>`;
+            html = `<tr><td colspan="${colspan}" class="px-6 py-4 text-center text-gray-500">Nenhuma turma encontrada.</td></tr>`;
         } else {
-            filteredClasses.forEach((cls, index) => {
-                const icon = cls.type === 'motora' ? 'fast-forward' : 'brain';
-                const iconColor = cls.type === 'motora' ? 'text-purple-600' : 'text-green-600';
-                const typeClass = cls.type === 'cognitiva' ? 'bg-green-100 text-green-600' : 'bg-purple-100 text-purple-600';
-                const typeText = cls.type === 'cognitiva' ? 'Cognitiva' : 'Motora';
+            paginatedClasses.forEach((cls, index) => {
+                const globalIndex = start + index; // Índice global para os botões de edição
+                const icon = cls.type.toLowerCase() === 'motora' ? 'fast-forward' : 'brain';
+                const iconColor = cls.type.toLowerCase() === 'motora' ? 'text-purple-600' : 'text-green-600';
+                const typeClass = cls.type.toLowerCase() === 'cognitiva' ? 'bg-green-100 text-green-600' : 'bg-purple-100 text-purple-600';
+                const typeText = cls.type.toLowerCase() === 'cognitiva' ? 'Cognitiva' : 'Motora';
                 const firstName = extractClassName(cls.name);
                 const capitalizedName = capitalizeFirstLetter(firstName);
-                const typeStyle = cls.type === 'motora' ? 'style="background-color: #f3e8ff"' : '';
+                const typeStyle = cls.type.toLowerCase() === 'motora' ? 'style="background-color: #f3e8ff"' : '';
                 const actionButtons = (currentUserRole === 'admin' || currentUserRole === 'secretaria' || currentUserRole === 'coordenador')
                     ? `<td class="px-6 py-4">
-                           <button class="edit-button" data-index="${index}">
+                           <button class="edit-button" data-index="${globalIndex}">
                                <i data-lucide="edit" class="h-4 w-4 mr-1"></i> Editar
                            </button>
                            <button class="delete-button" data-id="${cls.id}">
@@ -177,7 +301,7 @@
                            </button>
                        </td>`
                     : '';
-                tbody.innerHTML += `
+                html += `
                     <tr>
                         <td class="px-6 py-4">
                             <div class="flex items-center">
@@ -188,7 +312,7 @@
                                 </div>
                             </div>
                         </td>
-                        <td class="px-6 py-4">${cls.polo_name}</td>
+                        <td class="px-6 py-4">${formatPoloName(cls.polo_name)}</td>
                         <td class="px-6 py-4">
                             <span class="inline-flex px-2 py-1 rounded-full text-xs font-medium ${typeClass}" ${typeStyle}>
                                 ${typeText}
@@ -207,23 +331,203 @@
                     </tr>
                 `;
             });
-
-            document.querySelectorAll('.edit-button').forEach(button => {
-                button.addEventListener('click', () => {
-                    const index = button.getAttribute('data-index');
-                    openEditModal(index);
-                });
-            });
-
-            document.querySelectorAll('.delete-button').forEach(button => {
-                button.addEventListener('click', () => {
-                    const classId = button.getAttribute('data-id');
-                    deleteClass(classId);
-                });
-            });
         }
+
+        // Atualizar o DOM uma única vez
+        tbody.innerHTML = html;
+
+        // Adicionar ouvintes de eventos para os botões
+        document.querySelectorAll('.edit-button').forEach(button => {
+            button.addEventListener('click', () => {
+                const index = button.getAttribute('data-index');
+                openEditModal(index);
+            });
+        });
+
+        document.querySelectorAll('.delete-button').forEach(button => {
+            button.addEventListener('click', () => {
+                const classId = button.getAttribute('data-id');
+                deleteClass(classId);
+            });
+        });
+
         lucide.createIcons();
+        console.log('Tabela de turmas renderizada com', paginatedClasses.length, 'itens (página', currentPage, 'de', totalPages, ')');
     }
+
+    function updatePaginationWithRetry(attempt = 1, maxAttempts = 10) {
+        const delay = 200; // Atraso entre tentativas (ms)
+
+        // Logar o estado do DOM para depuração
+        const tableContainer = document.querySelector('.bg-white.rounded-lg.shadow-md.overflow-hidden.px-6');
+        console.log('Estado do DOM:', {
+            tableContainerExists: !!tableContainer,
+            tableContainerInnerHTML: tableContainer ? tableContainer.innerHTML : 'N/A',
+            topPaginationExists: !!document.querySelector('.pagination-top'),
+            bottomPaginationExists: !!document.querySelector('.pagination'),
+            attempt
+        });
+
+        // Forçar a criação dos contêineres se não existirem
+        if (tableContainer) {
+            let topPagination = document.querySelector('.pagination-top');
+            if (!topPagination) {
+                console.log('Criando contêiner .pagination-top dinamicamente');
+                topPagination = document.createElement('div');
+                topPagination.className = 'pagination-top py-4';
+                tableContainer.insertBefore(topPagination, tableContainer.querySelector('table'));
+            }
+
+            let bottomPagination = document.querySelector('.pagination');
+            if (!bottomPagination) {
+                console.log('Criando contêiner .pagination dinamicamente');
+                bottomPagination = document.createElement('div');
+                bottomPagination.className = 'pagination py-4';
+                tableContainer.appendChild(bottomPagination);
+            }
+        } else if (attempt < maxAttempts) {
+            console.warn(`Contêiner pai .bg-white.rounded-lg.shadow-md.overflow-hidden.px-6 não encontrado no DOM (tentativa ${attempt}/${maxAttempts}), tentando novamente em ${delay}ms...`);
+            setTimeout(() => {
+                updatePaginationWithRetry(attempt + 1, maxAttempts);
+            }, delay);
+            return;
+        } else {
+            console.error(`Contêiner pai .bg-white.rounded-lg.shadow-md.overflow-hidden.px-6 não encontrado no DOM após ${maxAttempts} tentativas`);
+            return;
+        }
+
+        // Verificar se os controles de paginação já estão atualizados
+        if (lastPaginationState.currentPage === currentPage && lastPaginationState.totalPages === totalPages) {
+            console.log('Controles de paginação já estão atualizados, pulando atualização:', { currentPage, totalPages });
+            return;
+        }
+
+        // Função auxiliar para criar os controles de paginação
+        const createPaginationControls = () => {
+            const paginationDiv = document.createElement('div');
+            paginationDiv.className = 'flex justify-center items-center space-x-2 mt-4';
+
+            const prevButton = document.createElement('button');
+            prevButton.textContent = 'Anterior';
+            prevButton.className = `px-4 py-2 rounded-md ${currentPage === 1 ? 'bg-gray-300 text-gray-500 cursor-not-allowed' : 'bg-blue-600 text-white hover:bg-blue-700'}`;
+            prevButton.disabled = currentPage === 1;
+            prevButton.onclick = () => {
+                if (currentPage > 1) {
+                    currentPage--;
+                    renderClasses();
+                    setTimeout(() => {
+                        updatePaginationWithRetry();
+                    }, 100);
+                }
+            };
+            paginationDiv.appendChild(prevButton);
+
+            const pageSpan = document.createElement('span');
+            pageSpan.textContent = `Página ${currentPage} de ${totalPages}`;
+            paginationDiv.appendChild(pageSpan);
+
+            const nextButton = document.createElement('button');
+            nextButton.textContent = 'Próxima';
+            nextButton.className = `px-4 py-2 rounded-md ${currentPage === totalPages ? 'bg-gray-300 text-gray-500 cursor-not-allowed' : 'bg-blue-600 text-white hover:bg-blue-700'}`;
+            nextButton.disabled = currentPage === totalPages;
+            nextButton.onclick = () => {
+                if (currentPage < totalPages) {
+                    currentPage++;
+                    renderClasses();
+                    setTimeout(() => {
+                        updatePaginationWithRetry();
+                    }, 100);
+                }
+            };
+            paginationDiv.appendChild(nextButton);
+
+            return paginationDiv;
+        };
+
+        // Desconectar o MutationObserver temporariamente para evitar loops
+        if (observer) {
+            observer.disconnect();
+            console.log('MutationObserver desconectado temporariamente durante a atualização dos controles de paginação');
+        }
+
+        // Atualizar a paginação no topo (pagination-top)
+        const topPagination = document.querySelector('.pagination-top');
+        if (topPagination) {
+            topPagination.innerHTML = ''; // Limpar o conteúdo existente
+            topPagination.appendChild(createPaginationControls());
+            console.log('Controles de paginação (topo) atualizados na tentativa', attempt, ':', { currentPage, totalPages });
+        } else if (attempt < maxAttempts) {
+            console.warn(`Contêiner .pagination-top não encontrado no DOM (tentativa ${attempt}/${maxAttempts}), tentando novamente em ${delay}ms...`);
+            setTimeout(() => {
+                updatePaginationWithRetry(attempt + 1, maxAttempts);
+            }, delay);
+            return;
+        } else {
+            console.error(`Contêiner .pagination-top não encontrado no DOM após ${maxAttempts} tentativas`);
+        }
+
+        // Atualizar a paginação no final (pagination)
+        const bottomPagination = document.querySelector('.pagination');
+        if (bottomPagination) {
+            bottomPagination.innerHTML = ''; // Limpar o conteúdo existente
+            bottomPagination.appendChild(createPaginationControls());
+            console.log('Controles de paginação (final) atualizados na tentativa', attempt, ':', { currentPage, totalPages });
+        } else if (attempt < maxAttempts) {
+            console.warn(`Contêiner .pagination não encontrado no DOM (tentativa ${attempt}/${maxAttempts}), tentando novamente em ${delay}ms...`);
+            setTimeout(() => {
+                updatePaginationWithRetry(attempt + 1, maxAttempts);
+            }, delay);
+            return;
+        } else {
+            console.error(`Contêiner .pagination não encontrado no DOM após ${maxAttempts} tentativas`);
+        }
+
+        // Atualizar o último estado da paginação
+        lastPaginationState = { currentPage, totalPages };
+
+        // Reconectar o MutationObserver após a atualização
+        if (observer) {
+            const tableContainer = document.querySelector('.bg-white.rounded-lg.shadow-md.overflow-hidden.px-6');
+            if (tableContainer) {
+                observer.observe(tableContainer, {
+                    childList: true,
+                    subtree: true
+                });
+                console.log('MutationObserver reconectado após a atualização dos controles de paginação');
+            }
+        }
+    }
+
+    // Inicializar o MutationObserver globalmente
+    document.addEventListener('DOMContentLoaded', () => {
+        const tableContainer = document.querySelector('.bg-white.rounded-lg.shadow-md.overflow-hidden.px-6');
+        if (tableContainer) {
+            observer = new MutationObserver((mutations) => {
+                mutations.forEach((mutation) => {
+                    console.log('Mudança detectada no DOM:', {
+                        mutationType: mutation.type,
+                        target: mutation.target.className,
+                        addedNodes: Array.from(mutation.addedNodes).map(node => node.className || 'Sem classe'),
+                        removedNodes: Array.from(mutation.removedNodes).map(node => node.className || 'Sem classe')
+                    });
+                    // Evitar reagir a mudanças nos contêineres de paginação
+                    const isPaginationChange = Array.from(mutation.addedNodes).some(node => node.className && node.className.includes('pagination')) ||
+                                              Array.from(mutation.removedNodes).some(node => node.className && node.className.includes('pagination'));
+                    if (!isPaginationChange) {
+                        setTimeout(() => {
+                            updatePaginationWithRetry();
+                        }, 100);
+                    }
+                });
+            });
+
+            observer.observe(tableContainer, {
+                childList: true,
+                subtree: true
+            });
+            console.log('MutationObserver iniciado globalmente para monitorar mudanças no contêiner pai');
+        }
+    });
 
     function formatSchedule(day) {
         const days = {
@@ -265,19 +569,22 @@
     function openEditModal(index) {
         const cls = classes[index];
         if (!cls) {
+            console.error('Turma não encontrada no índice:', index);
             return;
         }
 
         const modal = document.getElementById('edit-class-modal');
         if (!modal) {
+            console.error('Modal de edição não encontrado');
             return;
         }
         modal.style.display = 'block';
+        console.log('Modal de edição aberto para a turma:', cls.id);
 
         document.getElementById('edit-class-id').value = cls.id || '';
         document.getElementById('edit-name').value = cls.name || '';
         document.getElementById('edit-polo-name').value = cls.polo_name || userPoloName;
-        document.getElementById('edit-type').value = cls.type || 'cognitiva';
+        document.getElementById('edit-type').value = cls.type.toLowerCase() || 'cognitiva';
 
         const gradesSelect = document.getElementById('edit-grades');
         const gradesValue = JSON.stringify(cls.grades);
@@ -307,9 +614,11 @@
     function closeEditModal() {
         const modal = document.getElementById('edit-class-modal');
         if (!modal) {
+            console.error('Modal de edição não encontrado');
             return;
         }
         modal.style.display = 'none';
+        console.log('Modal de edição fechado');
     }
 
     async function saveClassChanges(event) {
@@ -338,6 +647,7 @@
             closeEditModal();
             fetchData();
         } catch (error) {
+            console.error('Erro ao salvar alterações da turma:', error.message);
             showToast('Erro: ' + error.message, 'error', 'alert-circle', 3000);
         }
     }
@@ -356,6 +666,7 @@
             showToast('Turma excluída com sucesso!', 'success', 'check-circle', 3000);
             fetchData();
         } catch (error) {
+            console.error('Erro ao excluir turma:', error.message);
             showToast('Erro: ' + error.message, 'error', 'alert-circle', 3000);
         }
     }
@@ -363,6 +674,7 @@
     function openCreateModal() {
         const modal = document.getElementById('create-class-modal');
         if (!modal) {
+            console.error('Modal de criação não encontrado');
             return;
         }
         modal.style.display = 'block';
@@ -374,14 +686,17 @@
 
         updateTypeIcon(disciplinas.length > 0 ? disciplinas[0].tipo : 'cognitiva');
         lucide.createIcons();
+        console.log('Modal de criação aberto');
     }
 
     function closeCreateModal() {
         const modal = document.getElementById('create-class-modal');
         if (!modal) {
+            console.error('Modal de criação não encontrado');
             return;
         }
         modal.style.display = 'none';
+        console.log('Modal de criação fechado');
     }
 
     function updateTypeIcon(type) {
@@ -391,8 +706,9 @@
         typeIcon.removeAttribute('data-lucide');
         typeIcon.className = 'h-5 w-5 mr-2';
 
-        typeIcon.setAttribute('data-lucide', type === 'cognitiva' ? 'brain' : 'fast-forward');
+        typeIcon.setAttribute('data-lucide', type.toLowerCase() === 'cognitiva' ? 'brain' : 'fast-forward');
         lucide.createIcons();
+        console.log('Ícone de tipo atualizado para', type);
     }
 
     function showTooltip(elementId, message) {
@@ -400,6 +716,9 @@
         if (tooltip) {
             tooltip.textContent = message;
             tooltip.style.display = 'block';
+            console.log('Exibindo tooltip para', elementId, ':', message);
+        } else {
+            console.warn('Tooltip não encontrado para', elementId);
         }
     }
 
@@ -408,6 +727,7 @@
 
         const form = document.getElementById('create-class-form');
         if (!form) {
+            console.error('Formulário de criação de turma não encontrado');
             return;
         }
 
@@ -434,6 +754,7 @@
         });
 
         if (hasError) {
+            console.warn('Validação do formulário falhou, erros exibidos nos tooltips');
             return;
         }
 
@@ -441,6 +762,7 @@
             classData.grades = JSON.parse(classData.grades);
         } catch (error) {
             showTooltip('grades', 'Erro ao processar o ano escolar');
+            console.error('Erro ao processar grades:', error.message);
             return;
         }
 
@@ -454,7 +776,9 @@
             showToast('Turma criada com sucesso!', 'success', 'check-circle', 3000);
             closeCreateModal();
             fetchData();
+            console.log('Turma criada com sucesso:', classData);
         } catch (error) {
+            console.error('Erro ao criar turma:', error.message);
             showToast('Erro: ' + error.message, 'error', 'alert-circle', 3000);
         }
     }
@@ -462,6 +786,7 @@
     function showToast(message, type, icon, duration = 3000) {
         const toastContainer = document.getElementById('custom-toast-container');
         if (!toastContainer) {
+            console.warn('Contêiner de toast não encontrado');
             return;
         }
 
@@ -479,12 +804,14 @@
 
         const timeout = setTimeout(() => {
             toastDiv.remove();
+            console.log('Toast removido:', message);
         }, duration);
 
         const closeButton = toastDiv.querySelector('.custom-toast-close');
         closeButton.addEventListener('click', () => {
             clearTimeout(timeout);
             toastDiv.remove();
+            console.log('Toast fechado manualmente:', message);
         });
     }
 
@@ -513,7 +840,7 @@
         }
 
         const cancelCreateButton = document.getElementById('cancel-create-class');
-        if (cancelCreateButton) {
+        if (cancelEditButton) {
             cancelCreateButton.addEventListener('click', closeCreateModal);
         }
 
@@ -536,10 +863,26 @@
             });
         }
 
-        fetchData();
+        const filterCognitivaButton = document.getElementById('filter-cognitiva');
+        if (filterCognitivaButton) {
+            filterCognitivaButton.addEventListener('click', () => filterClasses('cognitiva'));
+        } else {
+            console.warn('Botão filter-cognitiva não encontrado');
+        }
 
-        document.getElementById('filter-cognitiva').addEventListener('click', () => filterClasses('cognitiva'));
-        document.getElementById('filter-motora').addEventListener('click', () => filterClasses('motora'));
-        document.getElementById('edit-class-form').addEventListener('submit', saveClassChanges);
+        const filterMotoraButton = document.getElementById('filter-motora');
+        if (filterMotoraButton) {
+            filterMotoraButton.addEventListener('click', () => filterClasses('motora'));
+        } else {
+            console.warn('Botão filter-motora não encontrado');
+        }
+
+        const editForm = document.getElementById('edit-class-form');
+        if (editForm) {
+            editForm.addEventListener('submit', saveClassChanges);
+        }
+
+        fetchData();
+        console.log('Evento DOMContentLoaded disparado, fetchData chamado');
     });
 })();

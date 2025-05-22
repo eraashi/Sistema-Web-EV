@@ -114,18 +114,24 @@ const retryFetch = async (url, options, retries = 2, delay = 500) => {
     if (cached) {
         try {
             const { data, timestamp } = JSON.parse(cached);
-            console.log('Dados do cache:', { url, turmas_length: data.turmas?.length || 0, alunos_length: data.alunos?.data?.length || 0 }); // Log para depuração
-            if (Date.now() - timestamp < 10000 && 
-                data && 
-                Array.isArray(data.turmas) && data.turmas.length > 0 && 
-                Array.isArray(data.alunos?.data) && data.alunos.data.length > 0) {
+            let isValid = Date.now() - timestamp < 300000 && data; // TTL de 5 minutos (300.000 ms)
+            if (url.includes('/api/dashboard_data')) {
+                isValid = isValid && 
+                    Array.isArray(data.turmas) && data.turmas.length > 0 && 
+                    data.alunos && Array.isArray(data.alunos.data) && data.alunos.data.length > 0 && 
+                    data.turmas_ativas && Array.isArray(data.turmas_ativas.turmas);
+            } else if (url.includes('/api/polos')) {
+                isValid = isValid && Array.isArray(data);
+            } else {
+                isValid = isValid && Array.isArray(data);
+            }
+
+            if (isValid) {
                 return data;
             } else {
-                console.warn('Cache inválido ou incompleto, limpando:', { url });
                 localStorage.removeItem(cacheKey);
             }
         } catch (e) {
-            console.warn('Erro ao processar cache do localStorage:', e.message);
             localStorage.removeItem(cacheKey);
         }
     }
@@ -139,16 +145,12 @@ const retryFetch = async (url, options, retries = 2, delay = 500) => {
             const data = await response.json();
             try {
                 localStorage.setItem(cacheKey, JSON.stringify({ data, timestamp: Date.now() }));
-            } catch (e) {
-                console.warn('Erro ao salvar no localStorage:', e.message);
-            }
+            } catch (e) {}
             return data;
         } catch (error) {
             if (i < retries - 1) {
-                console.warn(`Tentativa ${i + 1} falhou para ${url}: ${error}. Tentando novamente em ${delay}ms...`);
                 await new Promise(resolve => setTimeout(resolve, delay));
             } else {
-                console.error(`Falhou após ${retries} tentativas para ${url}: ${error}`);
                 throw error;
             }
         }
@@ -172,16 +174,12 @@ async function fetchData() {
     const overlay = document.getElementById('loading-overlay');
     const mainContent = document.getElementById('main-content');
 
-    // Mostrar overlay de carregamento
     if (overlay && mainContent) {
         overlay.classList.remove('hidden');
         mainContent.classList.add('pointer-events-none');
-    } else {
-        console.warn('Elementos de overlay ou main-content não encontrados');
     }
 
     try {
-        // Inicializar variáveis
         students = [];
         classes = [];
         enrollments = [];
@@ -189,21 +187,13 @@ async function fetchData() {
         polos = [];
         studentsWithoutEnrollments = [];
 
-        // Flag para controlar renderização
         let isRendered = false;
-
-        // Tentar renderizar dados em cache
         const cacheKey = 'cache_/api/dashboard_data';
         const cached = localStorage.getItem(cacheKey);
         if (cached) {
             try {
                 const { data, timestamp } = JSON.parse(cached);
-                console.log('Dados do cache:', { 
-                    turmas_length: data.turmas?.length || 0,
-                    alunos_length: data.alunos?.data?.length || 0,
-                    turmas_ativas_length: data.turmas_ativas?.turmas?.length || 0
-                }); // Log para depuração
-                if (Date.now() - timestamp < 10000 && 
+                if (Date.now() - timestamp < 300000 && 
                     data && 
                     Array.isArray(data.turmas) && data.turmas.length > 0 && 
                     Array.isArray(data.alunos?.data) && data.alunos.data.length > 0) {
@@ -211,83 +201,49 @@ async function fetchData() {
                     classes = data.turmas;
                     enrollments = data.matriculas || [];
                     activeClasses = data.turmas_ativas?.turmas || [];
-                    polos = []; // Polos não estão em /api/dashboard_data, serão buscados separadamente
+                    polos = [];
                     studentsWithoutEnrollments = students.filter(student => {
                         return !enrollments.some(e => String(e.studentId).toLowerCase().trim() === String(student.id).toLowerCase().trim());
                     });
-                    console.log('Cache válido usado:', {
-                        classes_length: classes.length,
-                        students_length: students.length,
-                        activeClasses_length: activeClasses.length,
-                        studentsWithoutEnrollments_length: studentsWithoutEnrollments.length
-                    }); // Log para depuração
                     isRendered = true;
                     renderReports(data.turmas_ativas?.current_period || 'tarde', data.turmas_ativas?.current_day || null);
                 } else {
-                    console.warn('Cache inválido ou incompleto, limpando:', { cacheKey });
                     localStorage.removeItem(cacheKey);
                 }
             } catch (e) {
-                console.warn('Erro ao processar cache do localStorage:', e.message);
                 localStorage.removeItem(cacheKey);
             }
         }
 
-        // Buscar dados frescos
         const data = await retryFetch('/api/dashboard_data', { credentials: 'include' });
-        console.log('Resposta fresca de /api/dashboard_data:', { 
-            turmas_length: data.turmas?.length || 0,
-            alunos_length: data.alunos?.data?.length || 0,
-            turmas_ativas_length: data.turmas_ativas?.turmas?.length || 0,
-            turmas_sample: data.turmas?.slice(0, 2) || [],
-            alunos_sample: data.alunos?.data?.slice(0, 2) || []
-        }); // Log para depuração
-
-        // Atualizar variáveis com dados frescos
         students = Array.isArray(data.alunos?.data) ? data.alunos.data : [];
         classes = Array.isArray(data.turmas) ? data.turmas : [];
         enrollments = Array.isArray(data.matriculas) ? data.matriculas : [];
         activeClasses = Array.isArray(data.turmas_ativas?.turmas) ? data.turmas_ativas.turmas : [];
-        polos = []; // Polos não estão em /api/dashboard_data, buscar separadamente
+        polos = [];
         studentsWithoutEnrollments = students.filter(student => {
             return !enrollments.some(e => String(e.studentId).toLowerCase().trim() === String(student.id).toLowerCase().trim());
         });
-        console.log('Dados frescos processados:', {
-            classes_length: classes.length,
-            students_length: students.length,
-            activeClasses_length: activeClasses.length,
-            studentsWithoutEnrollments_length: studentsWithoutEnrollments.length
-        }); // Log para depuração
 
-        // Buscar polos separadamente, se necessário
         if (!isRendered || polos.length === 0) {
             try {
                 const polosData = await retryFetch('/api/polos', { credentials: 'include' });
                 polos = Array.isArray(polosData) ? polosData : [];
-                console.log('Polos carregados:', polos.length); // Log para depuração
             } catch (e) {
-                console.warn('Erro ao carregar polos:', e.message);
                 polos = [];
             }
         }
 
-        // Renderizar com dados frescos
         if (!isRendered || classes.length > 0 || students.length > 0) {
-            console.log('Renderizando com dados frescos');
             renderReports(data.turmas_ativas?.current_period || 'tarde', data.turmas_ativas?.current_day || null);
-        } else {
-            console.log('Pulando renderização, dados já exibidos via cache');
         }
 
-        // Esconder overlay
         if (overlay && mainContent) {
             overlay.classList.add('hidden');
             mainContent.classList.remove('pointer-events-none');
         }
     } catch (error) {
-        console.error('Erro em fetchData:', error.message);
         showToast('Erro ao carregar dados: ' + error.message, 'error', 'alert-circle');
-        // Renderizar com valores padrão
         renderReports('tarde', null);
         if (overlay && mainContent) {
             overlay.classList.add('hidden');
@@ -347,7 +303,6 @@ function formatarNumero(numero) {
 function showToast(message, type, icon) {
     const toastContainer = document.getElementById('custom-toast-container');
     if (!toastContainer) {
-        console.warn('Contêiner de toast não encontrado');
         return;
     }
 
@@ -375,10 +330,8 @@ function showToast(message, type, icon) {
 }
 
 function openStudentsModal(classId) {
-    console.log('Abrindo modal para turma ID:', classId);
     const cls = activeClasses.find(c => c.id === classId);
     if (!cls) {
-        console.error('Turma não encontrada para ID:', classId);
         showToast('Turma não encontrada', 'error', 'alert-circle');
         return;
     }
@@ -402,13 +355,11 @@ function openStudentsModal(classId) {
             </div>
         `).join('');
 
-    console.log('Exibindo modal com', cls.students.length, 'alunos');
     modal.classList.remove('hidden');
     document.body.style.overflow = 'hidden';
 }
 
 function closeModal() {
-    console.log('Fechando modal');
     const modal = document.getElementById('students-modal');
     modal.classList.add('hidden');
     document.body.style.overflow = '';
@@ -444,9 +395,6 @@ function renderStudentList(students, containerId, isEnrolled) {
                         ` : ''}
                     </div>
                 </div>
-                ${!isEnrolled ? `
-                    <button onclick="window.location.href='/enrollment?studentId=${student.id}'" class="bg-blue-600 text-white px-3 py-1 rounded-md hover:bg-blue-700">Matricular</button>
-                ` : ''}
             </div>
         `).join('');
 }
@@ -464,7 +412,6 @@ function renderPagination(containerId, currentPage, totalPages, onPageChange) {
     prevButton.onclick = () => currentPage > 1 && onPageChange(currentPage - 1);
     div.appendChild(prevButton);
 
-    // Show up to 5 page numbers around current page
     const maxPagesToShow = 5;
     let startPage = Math.max(1, currentPage - Math.floor(maxPagesToShow / 2));
     let endPage = Math.min(totalPages, startPage + maxPagesToShow - 1);
@@ -489,11 +436,6 @@ function renderPagination(containerId, currentPage, totalPages, onPageChange) {
 }
 
 function filterAvailableStudents(page = 1, search = '') {
-    console.log('=== Filtrando alunos disponíveis ===');
-    console.log('Página:', page, 'Busca:', search);
-    console.log('Total de alunos sem matrículas:', studentsWithoutEnrollments.length);
-
-    // Filtrar alunos sem matrículas com base na busca
     const availableStudents = search ?
         studentsWithoutEnrollments.filter(student => {
             const matchesSearch = student.name.toLowerCase().includes(search.toLowerCase()) || student.id.toLowerCase().includes(search.toLowerCase());
@@ -501,9 +443,6 @@ function filterAvailableStudents(page = 1, search = '') {
         }) :
         studentsWithoutEnrollments;
 
-    console.log('Alunos disponíveis filtrados:', availableStudents.length);
-
-    // Calcular paginação
     availableStudentsTotalPages = Math.ceil(availableStudents.length / STUDENTS_PER_PAGE);
     availableStudentsCurrentPage = Math.min(page, availableStudentsTotalPages) || 1;
     const start = (availableStudentsCurrentPage - 1) * STUDENTS_PER_PAGE;
@@ -860,14 +799,6 @@ function renderMovimentacaoCharts() {
 }
 
 function renderReports(currentPeriod, currentDay) {
-    console.log('Renderizando relatórios:', {
-        students_length: students.length,
-        classes_length: classes.length,
-        enrollments_length: enrollments.length,
-        activeClasses_length: activeClasses.length,
-        polos_length: polos.length
-    }); // Log para depuração
-
     document.getElementById('current-period').textContent = currentPeriod === 'manha' ? 'Manhã' : 'Tarde';
     document.getElementById('current-day').textContent = currentDay ? formatSchedule(currentDay, null, false) : 'Sem aulas hoje';
 
@@ -935,9 +866,7 @@ function renderReports(currentPeriod, currentDay) {
     document.getElementById('occupancy-rate').textContent = `${occupancyRate}%`;
     document.getElementById('occupancy-details').textContent = `${totalEnrolled} alunos matriculados de ${totalCapacity} vagas totais`;
 
-    // Paginate Enrolled Students
     const enrolledStudents = Array.isArray(students) ? students.filter(student => enrollments.some(e => String(e.studentId).toLowerCase().trim() === String(student.id).toLowerCase().trim())) : [];
-    console.log('Alunos matriculados:', enrolledStudents.length);
     enrolledStudentsTotalPages = Math.ceil(enrolledStudents.length / STUDENTS_PER_PAGE);
     enrolledStudentsCurrentPage = 1;
     const startEnrolled = (enrolledStudentsCurrentPage - 1) * STUDENTS_PER_PAGE;
@@ -984,6 +913,34 @@ function renderReports(currentPeriod, currentDay) {
     filterAvailableStudents(1);
 }
 
+// Função para alternar abas
+function showTab(tabId) {
+    ['distribuicao', 'frequencia', 'movimentacao', 'taxa', 'ativas'].forEach(id => {
+        const tab = document.getElementById(id + '-tab');
+        const button = document.querySelector(`button[data-tab="${id}"]`);
+        if (tab && button) {
+            tab.classList.add('hidden');
+            button.classList.remove('bg-blue-600', 'text-white');
+            button.classList.add('bg-gray-200', 'text-gray-700', 'hover:bg-gray-300');
+        }
+    });
+    const activeTab = document.getElementById(tabId + '-tab');
+    const activeButton = document.querySelector(`button[data-tab="${tabId}"]`);
+    if (activeTab && activeButton) {
+        activeTab.classList.remove('hidden');
+        activeButton.classList.remove('bg-gray-200', 'text-gray-700', 'hover:bg-gray-300');
+        activeButton.classList.add('bg-blue-600', 'text-white', 'hover:bg-blue-700');
+
+        if (tabId === 'frequencia') {
+            renderFrequenciaChart();
+        } else if (tabId === 'movimentacao') {
+            renderMovimentacaoCharts();
+        } else if (tabId === 'distribuicao') {
+            renderDistribuicaoCharts();
+        }
+    }
+}
+
 const style = document.createElement('style');
 style.innerHTML = `
     .class-type-tag {
@@ -1003,17 +960,45 @@ style.innerHTML = `
 `;
 document.head.appendChild(style);
 
-// Configurar debounce para o campo de busca
+// Configurar event listeners para botões e cards
 document.addEventListener('DOMContentLoaded', () => {
-    showTab('distribuicao');
-    const searchInput = document.getElementById('student-search-available');
-    const debouncedSearch = debounce((value) => {
-        filterAvailableStudents(1, value);
-    }, 300);
+    setTimeout(() => {
+        // Botões de abas
+        const tabButtons = Array.from(document.querySelectorAll('button[data-tab]'));
+        tabButtons.forEach((button, index) => {
+            if (!button || !(button instanceof HTMLElement)) {
+                return;
+            }
+            const tabId = button.getAttribute('data-tab');
+            if (tabId) {
+                button.addEventListener('click', () => showTab(tabId));
+            }
+        });
 
-    searchInput.addEventListener('input', (e) => {
-        debouncedSearch(e.target.value);
-    });
+        // Cards de resumo
+        const summaryCards = Array.from(document.querySelectorAll('div[data-tab]'));
+        summaryCards.forEach((card, index) => {
+            if (!card || !(card instanceof HTMLElement)) {
+                return;
+            }
+            const tabId = card.getAttribute('data-tab');
+            if (tabId) {
+                card.addEventListener('click', () => showTab(tabId));
+            }
+        });
 
-    fetchData();
+        showTab('distribuicao');
+        const searchInput = document.getElementById('student-search-available');
+        const debouncedSearch = debounce((value) => {
+            filterAvailableStudents(1, value);
+        }, 300);
+
+        if (searchInput) {
+            searchInput.addEventListener('input', (e) => {
+                debouncedSearch(e.target.value);
+            });
+        }
+
+        fetchData();
+    }, 500);
 });

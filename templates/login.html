@@ -6,8 +6,7 @@
     <title>Login - Escola Viva</title>
     <script src="https://cdn.tailwindcss.com"></script>
     <script src="https://unpkg.com/lucide@latest"></script>
-    <!-- Se você estiver usando um arquivo output.css gerado, descomente a linha abaixo e remova o CDN -->
-    <!-- <link href="/static/css/output.css" rel="stylesheet"> -->
+    <link href="/static/css/styles.css" rel="stylesheet">
 </head>
 <body class="bg-white min-h-screen flex flex-col">
     <!-- Contêiner Principal -->
@@ -16,7 +15,6 @@
         <div class="w-full lg:w-1/2 p-8 lg:pl-96 lg:p-8 flex flex-col justify-center">
             <!-- Espaço Reservado para Imagem (Logotipo) -->
             <div class="w-80 h-40 mb-2">
-                <!-- Você pode adicionar sua imagem aqui, por exemplo: -->
                 <img src="/static/src/logo media.png" alt="Logotipo" class="w-full h-full object-contain">
             </div>
 
@@ -37,7 +35,7 @@
                                 <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M16 7a4 4 0 11-8 0 4 4 0 018 0zM12 14a7 7 0 00-7 7h14a7 7 0 00-7-7z"></path>
                             </svg>
                         </div>
-                        <input type="text" id="cpf" name="cpf" class="pl-10 block w-full px-3 py-2 border border-gray-300 rounded-md shadow-sm focus:outline-none focus:ring-blue-500 focus:border-blue-500" required placeholder="Digite seu CPF">
+                        <input type="text" id="cpf" name="cpf" class="pl-10 block w-full px-3 py-2 border border-gray-300 rounded-md shadow-sm focus:outline-none focus:ring-blue-500 focus:border-blue-500" required placeholder="Digite seu CPF" maxlength="14">
                     </div>
                 </div>
 
@@ -57,7 +55,10 @@
 
                 <!-- Botão Entrar -->
                 <div>
-                    <button type="submit" class="w-full bg-blue-600 text-white px-4 py-3 rounded-md hover:bg-blue-700 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:ring-opacity-50 transition-colors duration-200 text-lg font-semibold">Entrar</button>
+                    <button type="submit" id="login-button" class="w-full bg-blue-600 text-white px-4 py-3 rounded-md hover:bg-blue-700 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:ring-opacity-50 transition-colors duration-300 text-lg font-semibold flex items-center justify-center space-x-2">
+                        <span id="button-text">Entrar</span>
+                        <i id="loading-spinner" data-lucide="loader" class="hidden h-5 w-5 text-white"></i>
+                    </button>
                 </div>
             </form>
 
@@ -84,12 +85,125 @@
     </div>
 
     <script>
+        // Função para formatar o CPF visualmente (XXX.XXX.XXX-XX)
+        function formatCPF(value) {
+            const numbers = value.replace(/\D/g, '');
+            return numbers
+                .replace(/(\d{3})(\d)/, '$1.$2')
+                .replace(/(\d{3})(\d)/, '$1.$2')
+                .replace(/(\d{3})(\d{1,2})$/, '$1-$2');
+        }
+
+        // Função para limpar o CPF para apenas números
+        function cleanCPF(value) {
+            return value.replace(/\D/g, '');
+        }
+
+        // Manipulação do campo CPF
+        const cpfInput = document.getElementById('cpf');
+        
+        // Limitar a digitação a números e formatar visualmente
+        cpfInput.addEventListener('input', (e) => {
+            const cursorPosition = e.target.selectionStart;
+            const oldValue = e.target.value;
+            const cleanedValue = cleanCPF(oldValue);
+            
+            if (cleanedValue.length > 11) {
+                e.target.value = formatCPF(cleanedValue.slice(0, 11));
+                return;
+            }
+
+            e.target.value = formatCPF(cleanedValue);
+
+            const newValue = e.target.value;
+            const addedChars = newValue.length - oldValue.length;
+            e.target.setSelectionRange(cursorPosition + addedChars, cursorPosition + addedChars);
+        });
+
+        // Manipular colar (paste) para aceitar apenas números
+        cpfInput.addEventListener('paste', (e) => {
+            e.preventDefault();
+            const pastedData = (e.clipboardData || window.clipboardData).getData('text');
+            const cleanedData = cleanCPF(pastedData);
+            
+            const limitedData = cleanedData.slice(0, 11);
+            cpfInput.value = formatCPF(limitedData);
+        });
+
+        // Função para realizar pré-cache de endpoints com timeout
+        async function preCacheData() {
+            const endpoints = ['/api/dashboard_data'];
+            const promises = endpoints.map(async (endpoint) => {
+                try {
+                    console.log(`Iniciando pré-cache para ${endpoint}`);
+                    const startTime = Date.now();
+                    const response = await fetch(endpoint, {
+                        method: 'GET',
+                        headers: { 'Content-Type': 'application/json' },
+                        credentials: 'include'
+                    });
+
+                    if (response.ok) {
+                        const data = await response.json();
+                        sessionStorage.setItem(`precache:${endpoint}`, JSON.stringify(data));
+                        console.log(`Pré-cache concluído para ${endpoint} em ${Date.now() - startTime}ms`);
+                    } else {
+                        console.log(`Falha no pré-cache para ${endpoint}: ${response.status}`);
+                    }
+                } catch (error) {
+                    console.log(`Erro ao fazer pré-cache para ${endpoint}:`, error.message);
+                }
+            });
+
+            await Promise.race([
+                Promise.all(promises),
+                new Promise(resolve => setTimeout(resolve, 5000))
+            ]);
+            console.log('Pré-cache finalizado ou timeout atingido');
+        }
+
+        // Função para aguardar 1 segundo (usada para o spinner após validação)
+        const delay = ms => new Promise(resolve => setTimeout(resolve, ms));
+
+        // Função para redefinir o estado do botão
+        function resetButtonState() {
+            const loginButton = document.getElementById('login-button');
+            const buttonText = document.getElementById('button-text');
+            const loadingSpinner = document.getElementById('loading-spinner');
+            const successIcon = document.getElementById('success-icon');
+
+            // Remover classes de cor verde e restaurar azul
+            loginButton.classList.remove('bg-green-600', 'hover:bg-green-700');
+            loginButton.classList.add('bg-blue-600', 'hover:bg-blue-700');
+
+            // Restaurar o texto para "Entrar"
+            buttonText.textContent = 'Entrar';
+
+            // Esconder o spinner
+            loadingSpinner.classList.add('hidden');
+            loadingSpinner.classList.remove('animate-spin');
+
+            // Remover o ícone de validação, se existir
+            if (successIcon) {
+                successIcon.remove();
+            }
+
+            // Habilitar o botão
+            loginButton.disabled = false;
+        }
+
+        // Manipulação do formulário de login
         document.getElementById('login-form').addEventListener('submit', async (e) => {
             e.preventDefault();
-            const cpf = document.getElementById('cpf').value;
+            const cpfInput = document.getElementById('cpf');
+            const cpf = cleanCPF(cpfInput.value);
             const password = document.getElementById('password').value;
 
-            // Limpar mensagens de erro anteriores
+            const loginButton = document.getElementById('login-button');
+            const buttonText = document.getElementById('button-text');
+            const loadingSpinner = document.getElementById('loading-spinner');
+            loginButton.disabled = true;
+
             const errorContainer = document.getElementById('error-message');
             errorContainer.innerHTML = '';
 
@@ -98,35 +212,85 @@
                     method: 'POST',
                     headers: { 'Content-Type': 'application/json' },
                     body: JSON.stringify({ cpf, password }),
-                    credentials: 'include'  // Enviar cookies de sessão
+                    credentials: 'include'
                 });
                 const data = await response.json();
 
                 if (response.ok) {
-                    console.log('Login bem-sucedido, redirecionando para:', data.redirect || '/dashboard');
+                    console.log('Credenciais validadas com sucesso');
+
+                    // Adicionar o ícone de validação dinamicamente
+                    const successIcon = document.createElement('i');
+                    successIcon.id = 'success-icon';
+                    successIcon.setAttribute('data-lucide', 'check-circle');
+                    successIcon.classList.add('h-5', 'w-5', 'mr-2', 'text-white', 'opacity-0', 'transform', 'scale-0', 'transition-all', 'duration-300');
+                    loginButton.insertBefore(successIcon, buttonText);
+
+                    // Após validação, mudar a cor do botão para verde, mostrar o ícone de validação e o spinner
+                    loginButton.classList.remove('bg-blue-600', 'hover:bg-blue-700');
+                    loginButton.classList.add('bg-green-600', 'hover:bg-green-700');
+                    buttonText.textContent = 'Entrando...';
+                    successIcon.classList.remove('opacity-0', 'scale-0');
+                    successIcon.classList.add('opacity-100', 'scale-100');
+                    loadingSpinner.classList.remove('hidden');
+                    loadingSpinner.classList.add('animate-spin');
+
+                    // Garantir que os ícones sejam renderizados (usar setTimeout para aguardar atualização do DOM)
+                    setTimeout(() => {
+                        lucide.createIcons();
+                    }, 10);
+
+                    const startTime = Date.now();
+                    await preCacheData();
+                    console.log(`Pré-cache levou ${Date.now() - startTime}ms`);
+
+                    const elapsedTime = Date.now() - startTime;
+                    const remainingTime = 1000 - elapsedTime;
+                    if (remainingTime > 0) {
+                        await delay(remainingTime);
+                    }
+
+                    console.log('Redirecionando para:', data.redirect || '/dashboard');
                     window.location.href = data.redirect || '/dashboard';
                 } else {
                     console.log('Erro ao fazer login:', data.error || 'Erro desconhecido');
-                    // Inserir a div de erro no contêiner
                     const errorDiv = document.createElement('div');
                     errorDiv.className = 'bg-red-100 border-l-4 border-red-500 text-red-700 p-4 rounded-lg';
                     errorDiv.setAttribute('role', 'alert');
                     errorDiv.innerHTML = '<p>Credenciais inválidas. Tente novamente.</p>';
                     errorContainer.appendChild(errorDiv);
+
+                    loginButton.disabled = false;
                 }
             } catch (error) {
                 console.log('Erro na requisição de login:', error.message);
-                // Inserir a div de erro no contêiner
                 const errorDiv = document.createElement('div');
                 errorDiv.className = 'bg-red-100 border-l-4 border-red-500 text-red-700 p-4 rounded-lg';
                 errorDiv.setAttribute('role', 'alert');
                 errorDiv.innerHTML = '<p>Erro: ' + error.message + '</p>';
                 errorContainer.appendChild(errorDiv);
+
+                loginButton.disabled = false;
             }
         });
 
-        // Inicializar ícones Lucide
-        lucide.createIcons();
+        // Inicializar ícones e redefinir o botão ao carregar a página
+        document.addEventListener('DOMContentLoaded', () => {
+            // Inicializar ícones estáticos (como o do cadeado)
+            lucide.createIcons();
+
+            // Redefinir o estado do botão
+            resetButtonState();
+        });
+
+        // Redefinir o botão ao voltar para a página (lidar com cache do navegador)
+        window.addEventListener('pageshow', (event) => {
+            if (event.persisted) {
+                // A página foi restaurada do cache do navegador (ex.: ao clicar em "voltar")
+                resetButtonState();
+                lucide.createIcons();
+            }
+        });
     </script>
 </body>
 </html>

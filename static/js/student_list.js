@@ -10,12 +10,24 @@ const retryFetch = async (url, options, retries = 2, delay = 500) => {
     if (cached) {
         try {
             const { data, timestamp } = JSON.parse(cached);
-            if (Date.now() - timestamp < 10000 && data && data.data && Array.isArray(data.data)) {
+            console.log('Dados do cache local:', { 
+                url, 
+                data_length: data?.data?.length || 0, 
+                total_pages: data?.total_pages || 0, 
+                total_alunos: data?.total_alunos || 0 
+            });
+            if (Date.now() - timestamp < 300000 && data && data.data && Array.isArray(data.data)) {
+                console.log('Cache local válido usado:', { data_length: data.data.length });
                 return data;
             } else {
+                console.warn('Cache local inválido ou incompleto:', {
+                    timestamp_valid: Date.now() - timestamp < 300000,
+                    data_valid: data && data.data && Array.isArray(data.data)
+                });
                 localStorage.removeItem(cacheKey);
             }
         } catch (e) {
+            console.warn('Erro ao processar cache do localStorage:', e.message);
             localStorage.removeItem(cacheKey);
         }
     }
@@ -29,12 +41,22 @@ const retryFetch = async (url, options, retries = 2, delay = 500) => {
             const data = await response.json();
             try {
                 localStorage.setItem(cacheKey, JSON.stringify({ data, timestamp: Date.now() }));
-            } catch (e) {}
+                console.log('Dados armazenados no cache local:', { 
+                    url, 
+                    data_length: data?.data?.length || 0, 
+                    total_pages: data?.total_pages || 0, 
+                    total_alunos: data?.total_alunos || 0 
+                });
+            } catch (e) {
+                console.warn('Erro ao salvar no localStorage:', e.message);
+            }
             return data;
         } catch (error) {
             if (i < retries - 1) {
+                console.warn(`Tentativa ${i + 1} falhou para ${url}: ${error}. Tentando novamente em ${delay}ms...`);
                 await new Promise(resolve => setTimeout(resolve, delay));
             } else {
+                console.error(`Falhou após ${retries} tentativas para ${url}: ${error}`);
                 throw error;
             }
         }
@@ -57,6 +79,8 @@ async function fetchStudents(page = 1, filters = {}) {
         students = [];
         let isRendered = false;
 
+        console.log('Filtros enviados para /api/alunos_paginados:', filters);
+
         const params = new URLSearchParams({ page, per_page: 100 });
         for (const [key, value] of Object.entries(filters)) {
             if (value) {
@@ -70,31 +94,65 @@ async function fetchStudents(page = 1, filters = {}) {
         if (cached) {
             try {
                 const { data, timestamp } = JSON.parse(cached);
-                if (Date.now() - timestamp < 10000 && data && Array.isArray(data.data)) {
+                console.log('Dados do cache local (fetchStudents):', { 
+                    data_length: data?.data?.length || 0, 
+                    total_pages: data?.total_pages || 0, 
+                    total_alunos: data?.total_alunos || 0 
+                });
+                if (Date.now() - timestamp < 300000 && data && Array.isArray(data.data)) {
                     students = data.data;
                     totalPages = data.total_pages;
                     currentPage = data.current_page;
                     totalAlunos = data.total_alunos;
+                    console.log('Cache local válido usado (fetchStudents):', {
+                        students_length: students.length,
+                        totalPages,
+                        currentPage,
+                        totalAlunos
+                    });
                     isRendered = true;
                     renderStudents();
                     updatePagination();
                 } else {
+                    console.warn('Cache local inválido ou incompleto (fetchStudents):', {
+                        timestamp_valid: Date.now() - timestamp < 300000,
+                        data_valid: data && Array.isArray(data.data)
+                    });
                     localStorage.removeItem(cacheKey);
                 }
             } catch (e) {
+                console.warn('Erro ao processar cache do localStorage (fetchStudents):', e.message);
                 localStorage.removeItem(cacheKey);
             }
         }
 
+        console.log('Buscando dados frescos de /api/alunos_paginados');
         const data = await retryFetch(url, { credentials: 'include' });
+        console.log('Resposta fresca de /api/alunos_paginados:', { 
+            data_length: data?.data?.length || 0, 
+            total_pages: data?.total_pages || 0, 
+            total_alunos: data?.total_alunos || 0 
+        });
+
         students = Array.isArray(data.data) ? data.data : [];
         totalPages = data.total_pages || 1;
         currentPage = data.current_page || 1;
         totalAlunos = data.total_alunos || 0;
 
         if (!isRendered || students.length > 0) {
+            console.log('Renderizando com dados frescos');
             renderStudents();
             updatePagination();
+        } else {
+            console.log('Pulando renderização, dados já exibidos via cache');
+        }
+
+        // Carregar dados do dashboard para atualizar o cache, se necessário
+        const dashboardCacheKey = 'cache_/api/dashboard_data?apply_unit_filter=true';
+        const dashboardCached = localStorage.getItem(dashboardCacheKey);
+        if (!dashboardCached) {
+            console.log('Atualizando cache do dashboard_data');
+            await retryFetch('/api/dashboard_data?apply_unit_filter=true', { credentials: 'include' });
         }
 
         if (overlay && mainContent) {
@@ -120,8 +178,42 @@ function renderStudents() {
         tbody.innerHTML = `<tr><td colspan="${colspan}" class="px-6 py-4 text-center text-gray-500">Nenhum aluno encontrado com os filtros selecionados.</td></tr>`;
     } else {
         students.forEach(student => {
-            const statusClass = student.status === 'complete' ? 'badge-complete' : student.status === 'partial' ? 'badge-partial' : 'badge-pending';
-            const statusText = student.status === 'complete' ? 'Completo' : student.status === 'partial' ? 'Parcial' : 'Pendente';
+            let statusClass, statusText;
+            switch (student.status) {
+                case 'complete':
+                    statusClass = 'badge-complete';
+                    statusText = 'Completo';
+                    break;
+                case 'partial':
+                    statusClass = 'badge-partial';
+                    statusText = 'Parcial';
+                    break;
+                case 'pending':
+                    statusClass = 'badge-pending';
+                    statusText = 'Pendente';
+                    break;
+                case 'sem_matriculas':
+                    statusClass = 'badge-sem-matriculas';
+                    statusText = 'Sem Matrículas';
+                    break;
+                default:
+                    statusClass = 'badge-pending';
+                    statusText = 'Desconhecido';
+            }
+            const pcdDisplay = student.pcd === 'Com Deficiência' ? 'Sim' : student.pcd === 'Sem Deficiência' ? 'Não' : 'Não especificado';
+            const poloDisplay = student.polo_name
+                .replace('POLO I (Bacaxá)', 'POLO Bacaxá')
+                .replace('POLO II (Sampaio Correia)', 'POLO Sampaio Correia')
+                .replace('Polo III (Jaconé)', 'POLO Jaconé')
+                .replace('Polo IV (Saquarema)', 'POLO Saquarema');
+            // Botão para visualizar turmas, aparece apenas se o aluno tiver matrículas
+            const hasEnrollments = student.enrollments && student.enrollments.length > 0;
+            const classesButton = hasEnrollments
+                ? `<button class="bg-green-800 text-white px-3 py-1 rounded-md flex items-center justify-center" onclick='openClassesModal(${JSON.stringify(student)})'>
+                       <i data-lucide="search" class="h-4 w-4 mr-1"></i> Turmas
+                   </button>`
+                : `<span>-</span>`;
+
             const editButton = (currentUserRole === 'admin' || currentUserRole === 'secretaria' || currentUserRole === 'coordenador')
                 ? `<td class="px-6 py-4">
                        <button class="edit-button" onclick='openEditModal(${JSON.stringify(student)})'>
@@ -139,16 +231,17 @@ function renderStudents() {
                             <div class="font-medium">${student.name}</div>
                         </div>
                     </td>
-                    <td class="px-6 py-4">${student.matricula}</td>
-                    <td class="px-6 py-4">${student.polo_name}</td>
                     <td class="px-6 py-4">${student.turma_unidade || 'Não especificado'}</td>
+                    <td class="px-6 py-4">${student.matricula}</td>
+                    <td class="px-6 py-4">${poloDisplay}</td>
                     <td class="px-6 py-4">${student.genero || 'Não especificado'}</td>
-                    <td class="px-6 py-4">${student.pcd || 'Não especificado'}</td>
+                    <td class="px-6 py-4">${pcdDisplay}</td>
                     <td class="px-6 py-4">${student.unidade || 'Não especificado'}</td>
                     <td class="px-6 py-4">${student.etapa || 'Não especificado'}</td>
                     <td class="px-6 py-4">
                         <span class="badge ${statusClass}">${statusText}</span>
                     </td>
+                    <td class="px-6 py-4">${classesButton}</td>
                     ${editButton}
                 </tr>
             `;
@@ -189,7 +282,11 @@ function openEditModal(student) {
 
     document.getElementById('edit-student-id').value = student.id || '';
     document.getElementById('edit-name').value = student.name || '';
-    document.getElementById('edit-polo-name').value = student.polo_name || 'POLO I (Porto da Roça)';
+    document.getElementById('edit-polo-name').value = student.polo_name
+        .replace('POLO I (Bacaxá)', 'POLO Bacaxá')
+        .replace('POLO II (Sampaio Correia)', 'POLO Sampaio Correia')
+        .replace('Polo III (Jaconé)', 'POLO Jaconé')
+        .replace('Polo IV (Saquarema)', 'POLO Saquarema') || 'POLO Bacaxá';
 
     const unidadeSelect = document.getElementById('edit-unidade');
     if (student.unidade && unidadeSelect.querySelector(`option[value="${student.unidade}"]`)) {
@@ -242,6 +339,50 @@ function openEditModal(student) {
 
 function closeEditModal() {
     const modal = document.getElementById('edit-student-modal');
+    if (!modal) {
+        return;
+    }
+    modal.style.display = 'none';
+}
+
+function openClassesModal(student) {
+    const modal = document.getElementById('view-classes-modal');
+    const classesList = document.getElementById('classes-list');
+    if (!modal || !classesList) {
+        return;
+    }
+
+    classesList.innerHTML = '';
+    if (student.enrollments && student.enrollments.length > 0) {
+        student.enrollments.forEach(enrollment => {
+            const classType = enrollment.type === 'cognitiva' ? 'Cognitiva' : 'Motora';
+            const gradesDisplay = Array.isArray(enrollment.grades)
+                ? enrollment.grades.map(g => `${g}º`).join(' e ')
+                : enrollment.grades || 'Não especificado';
+            const card = `
+                <div class="class-card">
+                    <h3 class="inline-flex items-center">
+                        ${enrollment.name}
+                        <span class="class-type-tag ${enrollment.type}">${classType}</span>
+                    </h3>
+                    <p><strong>Dia:</strong> ${enrollment.day}</p>
+                    <p><strong>Período:</strong> ${enrollment.period}</p>
+                    <p><strong>Faixa Etária:</strong> ${gradesDisplay}</p>
+                    <p><strong>Polo:</strong> ${enrollment.polo_name}</p>
+                </div>
+            `;
+            classesList.innerHTML += card;
+        });
+    } else {
+        classesList.innerHTML = '<p class="text-gray-500">Nenhuma turma encontrada para este aluno.</p>';
+    }
+
+    modal.style.display = 'block';
+    lucide.createIcons();
+}
+
+function closeClassesModal() {
+    const modal = document.getElementById('view-classes-modal');
     if (!modal) {
         return;
     }
@@ -327,6 +468,15 @@ document.addEventListener('DOMContentLoaded', () => {
         modal.addEventListener('click', (event) => {
             if (event.target === modal) {
                 closeEditModal();
+            }
+        });
+    }
+
+    const classesModal = document.getElementById('view-classes-modal');
+    if (classesModal) {
+        classesModal.addEventListener('click', (event) => {
+            if (event.target === classesModal) {
+                closeClassesModal();
             }
         });
     }

@@ -2,6 +2,7 @@ let students = [];
 let classes = [];
 let enrollments = [];
 let selectedClass = null;
+let currentFilterType = 'cognitiva'; // Novo: variável para rastrear o filtro atual
 
 // Lista de unidades permitidas
 const allowedUnits = [
@@ -21,7 +22,6 @@ const allowedUnits = [
     "E.M. LÚCIO NUNES",
     "E.M. MANOEL MUNIZ DA SILVA",
     "E.M. MARGARIDA ROSA DE AMORIM",
-    "E.M. MARIA LUIZA DE AMORIM MENDONÇA",
     "E.M. ORGÉ FERREIRA DOS SANTOS",
     "E.M. PREFEITO WALQUIDES DE SOUZA LIMA",
     "E.M. PROFESSOR FRANCISCO VIGNOLI",
@@ -39,6 +39,77 @@ const allowedUnits = [
     "C.M.E. PADRE MANUEL"
 ];
 
+// Função para alternar o estado dos botões
+function toggleButtonsState(disable, clickedButton = null) {
+    const enrollButtons = document.querySelectorAll('#available-students button');
+    const unenrollButtons = document.querySelectorAll('#enrolled-students button');
+    const allButtons = [...enrollButtons, ...unenrollButtons];
+
+    allButtons.forEach(button => {
+        button.disabled = disable;
+        if (button === clickedButton && disable) {
+            const icon = button.querySelector('[data-lucide]');
+            if (icon) {
+                console.log('Antes de aplicar loader:', icon.outerHTML);
+                icon.setAttribute('data-lucide', 'loader');
+                icon.classList.add('animate-spin');
+                console.log('Após aplicar loader:', icon.outerHTML);
+                // Forçar renderização do ícone com pequeno atraso
+                setTimeout(() => {
+                    lucide.createIcons();
+                    console.log('Ícone loader renderizado no botão:', button, icon.outerHTML);
+                }, 50);
+            } else {
+                console.warn('Ícone não encontrado no botão:', button);
+            }
+        } else if (button === clickedButton && !disable) {
+            const icon = button.querySelector('[data-lucide]');
+            if (icon) {
+                console.log('Antes de restaurar ícone:', icon.outerHTML);
+                icon.classList.remove('animate-spin');
+                icon.setAttribute('data-lucide', button.classList.contains('bg-blue-600') ? 'plus' : 'trash-2');
+                console.log('Após restaurar ícone:', icon.outerHTML);
+                // Forçar renderização do ícone com pequeno atraso
+                setTimeout(() => {
+                    lucide.createIcons();
+                    console.log('Ícone original restaurado no botão:', button, icon.outerHTML);
+                }, 50);
+            } else {
+                console.warn('Ícone não encontrado no botão ao restaurar:', button);
+            }
+        }
+    });
+}
+
+// Função para invalidar caches relevantes
+function invalidateCaches() {
+    // Limpar caches específicos
+    const matriculasCacheKey = 'cache_/api/matriculas';
+    const dashboardCacheKey = 'cache_/api/dashboard_data?apply_unit_filter=false';
+    localStorage.removeItem(matriculasCacheKey);
+    localStorage.removeItem(dashboardCacheKey);
+
+    // Limpar todas as variações do cache de /api/dashboard_data no localStorage
+    const localStorageKeys = Object.keys(localStorage);
+    localStorageKeys.forEach(key => {
+        if (key.startsWith('cache_/api/dashboard_data')) {
+            localStorage.removeItem(key);
+            console.log(`Cache local removido: ${key}`);
+        }
+    });
+
+    // Limpar todas as variações do pré-cache de /api/dashboard_data no sessionStorage
+    const sessionStorageKeys = Object.keys(sessionStorage);
+    sessionStorageKeys.forEach(key => {
+        if (key.startsWith('precache:/api/dashboard_data')) {
+            sessionStorage.removeItem(key);
+            console.log(`Pré-cache removido: ${key}`);
+        }
+    });
+
+    console.log('Caches invalidados:', { matriculasCacheKey, dashboardCacheKey });
+}
+
 // Função de retentativa para requisições
 const retryFetch = async (url, options, retries = 2, delay = 500) => {
     const cacheKey = `cache_${url}`;
@@ -46,14 +117,31 @@ const retryFetch = async (url, options, retries = 2, delay = 500) => {
     if (cached) {
         try {
             const { data, timestamp } = JSON.parse(cached);
-            console.log('Dados do cache:', { url, turmas_length: data.turmas?.length || 0, alunos_length: data.alunos?.data?.length || 0 }); // Log para depuração
-            if (Date.now() - timestamp < 10000 && 
+            console.log('Dados do cache local:', { 
+                url, 
+                turmas_length: data.turmas?.length || 0, 
+                alunos_length: data.alunos?.data?.length || 0,
+                matriculas_length: data.matriculas?.length || 0 
+            });
+            // TTL de 5 minutos (300000 ms)
+            if (Date.now() - timestamp < 300000 && 
                 data && 
                 Array.isArray(data.turmas) && data.turmas.length > 0 && 
                 Array.isArray(data.alunos?.data) && data.alunos.data.length > 0) {
+                console.log('Cache local válido usado:', { 
+                    url, 
+                    turmas_length: data.turmas?.length || 0, 
+                    alunos_length: data.alunos?.data?.length || 0,
+                    matriculas_length: data.matriculas?.length || 0 
+                });
                 return data;
             } else {
-                console.warn('Cache inválido ou incompleto, limpando:', { url });
+                console.warn('Cache local inválido ou expirado, removendo:', {
+                    url,
+                    timestamp_valid: Date.now() - timestamp < 300000,
+                    turmas_valid: Array.isArray(data.turmas) && data.turmas.length > 0,
+                    alunos_valid: Array.isArray(data.alunos?.data) && data.alunos.data.length > 0
+                });
                 localStorage.removeItem(cacheKey);
             }
         } catch (e) {
@@ -66,11 +154,17 @@ const retryFetch = async (url, options, retries = 2, delay = 500) => {
         try {
             const response = await fetch(url, options);
             if (!response.ok) {
-                throw new Error(`Erro HTTP! Status: ${response.status}`);
+                throw new Error(`HTTP error! Status: ${response.status}`);
             }
             const data = await response.json();
             try {
                 localStorage.setItem(cacheKey, JSON.stringify({ data, timestamp: Date.now() }));
+                console.log('Dados armazenados no cache local:', { 
+                    url, 
+                    turmas_length: data.turmas?.length || 0, 
+                    alunos_length: data.alunos?.data?.length || 0,
+                    matriculas_length: Array.isArray(data) ? data.length : (data.matriculas?.length || 0) 
+                });
             } catch (e) {
                 console.warn('Erro ao salvar no localStorage:', e.message);
             }
@@ -89,27 +183,25 @@ const retryFetch = async (url, options, retries = 2, delay = 500) => {
 
 async function loadData() {
     try {
-        // Inicializar variáveis
         students = [];
         classes = [];
         enrollments = [];
-        selectedClass = null;
+        const previousClassId = selectedClass ? selectedClass.id : null;
+        const previousFilterType = currentFilterType; // Novo: salvar o filtro atual
 
-        // Flag para controlar renderização
         let isRendered = false;
 
-        // Tentar renderizar dados em cache
-        const cacheKey = 'cache_/api/dashboard_data';
+        const cacheKey = 'cache_/api/dashboard_data?apply_unit_filter=false';
         const cached = localStorage.getItem(cacheKey);
         if (cached) {
             try {
                 const { data, timestamp } = JSON.parse(cached);
-                console.log('Dados do cache:', { 
+                console.log('Dados do cache local (dashboard_data):', { 
                     turmas_length: data.turmas?.length || 0,
                     alunos_length: data.alunos?.data?.length || 0,
                     matriculas_length: data.matriculas?.length || 0
-                }); // Log para depuração
-                if (Date.now() - timestamp < 10000 && 
+                });
+                if (Date.now() - timestamp < 300000 && 
                     data && 
                     Array.isArray(data.turmas) && data.turmas.length > 0 && 
                     Array.isArray(data.alunos?.data) && data.alunos.data.length > 0) {
@@ -120,30 +212,32 @@ async function loadData() {
                         classes_length: classes.length,
                         students_length: students.length,
                         enrollments_length: enrollments.length
-                    }); // Log para depuração
+                    });
                     isRendered = true;
-                    filterClasses('cognitiva');
+                    filterClasses(previousFilterType); // Novo: usar o filtro salvo
                 } else {
-                    console.warn('Cache inválido ou incompleto, limpando:', { cacheKey });
+                    console.warn('Cache de dashboard_data inválido ou expirado, removendo:', {
+                        timestamp_valid: Date.now() - timestamp < 300000,
+                        turmas_valid: Array.isArray(data.turmas) && data.turmas.length > 0,
+                        alunos_valid: Array.isArray(data.alunos?.data) && data.alunos.data.length > 0
+                    });
                     localStorage.removeItem(cacheKey);
                 }
             } catch (e) {
-                console.warn('Erro ao processar cache do localStorage:', e.message);
+                console.warn('Erro ao processar cache de dashboard_data:', e.message);
                 localStorage.removeItem(cacheKey);
             }
         }
 
-        // Buscar dados frescos
-        const data = await retryFetch('/api/dashboard_data', { credentials: 'include' });
+        const data = await retryFetch('/api/dashboard_data?apply_unit_filter=false', { credentials: 'include' });
         console.log('Resposta fresca de /api/dashboard_data:', { 
             turmas_length: data.turmas?.length || 0,
             alunos_length: data.alunos?.data?.length || 0,
             matriculas_length: data.matriculas?.length || 0,
             turmas_sample: data.turmas?.slice(0, 2) || [],
             alunos_sample: data.alunos?.data?.slice(0, 2) || []
-        }); // Log para depuração
+        });
 
-        // Atualizar variáveis com dados frescos
         students = Array.isArray(data.alunos?.data) ? data.alunos.data : [];
         classes = Array.isArray(data.turmas) ? data.turmas : [];
         enrollments = Array.isArray(data.matriculas) ? data.matriculas : [];
@@ -151,27 +245,30 @@ async function loadData() {
             classes_length: classes.length,
             students_length: students.length,
             enrollments_length: enrollments.length
-        }); // Log para depuração
+        });
 
-        // Renderizar com dados frescos
         if (!isRendered || classes.length > 0 || students.length > 0) {
             console.log('Renderizando com dados frescos');
-            filterClasses('cognitiva');
+            filterClasses(previousFilterType); // Novo: usar o filtro salvo
         } else {
             console.log('Pulando renderização, dados já exibidos via cache');
+        }
+
+        // Restaurar a seleção da turma atual, se aplicável
+        if (previousClassId) {
+            selectClass(previousClassId);
         }
     } catch (error) {
         console.error('Erro em loadData:', error.message);
         showToast('Erro ao carregar dados: ' + error.message, 'error', 'alert-circle');
-        // Renderizar com valores padrão
-        filterClasses('cognitiva');
+        filterClasses(currentFilterType); // Novo: usar o filtro atual em caso de erro
     }
 }
 
 async function refreshEnrollments() {
     try {
         const data = await retryFetch('/api/matriculas', { credentials: 'include' });
-        console.log('Matrículas recarregadas:', data.length); // Log para depuração
+        console.log('Matrículas recarregadas:', { matriculas_length: data.length });
         return Array.isArray(data) ? data : enrollments;
     } catch (error) {
         console.warn('Erro ao recarregar matrículas:', error.message);
@@ -299,21 +396,23 @@ function arraysEqual(arr1, arr2) {
 }
 
 function filterClasses(type) {
-    const search = document.getElementById('class-search').value.toLowerCase();
-    const typeFilter = type || (document.querySelector('button.bg-blue-600')?.innerText.toLowerCase() === 'cognitivas' ? 'cognitiva' : 'motora');
-    const dayFilter = document.getElementById('day-filter').value;
-    const periodFilter = document.getElementById('period-filter').value;
-    const poloFilter = document.getElementById('polo-filter') ? document.getElementById('polo-filter').value : '';
-    const gradeFilter = document.getElementById('grade-filter') ? document.getElementById('grade-filter').value : '';
+    currentFilterType = type || currentFilterType; // Novo: atualizar o filtro atual
+
+    const search = document.getElementById('class-search')?.value.toLowerCase() || '';
+    const typeFilter = currentFilterType; // Novo: usar o filtro atual
+    const dayFilter = document.getElementById('day-filter')?.value || '';
+    const periodFilter = document.getElementById('period-filter')?.value || '';
+    const poloFilter = document.getElementById('polo-filter')?.value || '';
+    const gradeFilter = document.getElementById('grade-filter')?.value || '';
 
     document.querySelectorAll('button').forEach(btn => {
         btn.classList.remove('bg-blue-600', 'text-white');
-        btn.classList.add('bg-gray-200', 'text-gray-700', 'hover:bg-gray-300');
+        btn.classList.add('bg-gray-200', 'text-gray-700');
     });
     const filterButton = document.querySelector(`#filter-${typeFilter}`);
     if (filterButton) {
-        filterButton.classList.remove('bg-gray-200', 'text-gray-700', 'hover:bg-gray-300');
-        filterButton.classList.add('bg-blue-600', 'text-white', 'hover:bg-blue-700');
+        filterButton.classList.remove('bg-gray-200', 'text-gray-700');
+        filterButton.classList.add('bg-blue-600', 'text-white');
     }
 
     const filteredClasses = classes.filter(cls => {
@@ -332,46 +431,57 @@ function filterClasses(type) {
     });
 
     const div = document.getElementById('class-list');
-    div.innerHTML = filteredClasses.length === 0 ?
-        '<div class="text-center py-4 text-gray-500">Nenhuma turma disponível</div>' :
-        filteredClasses.map(cls => {
-            const className = extractClassName(cls.name);
-            const capitalizedName = capitalizeFirstLetter(className);
-            const classType = cls.type === 'cognitiva' ? 'Cognitiva' : 'Motora';
-            return `
-                <div class="flex items-center justify-between p-4 border border-gray-200 rounded-md hover:bg-gray-50 cursor-pointer" onclick="selectClass('${cls.id}')">
-                    <div>
-                        <p class="font-medium inline-flex items-center">
-                            ${capitalizedName}
-                            <span class="class-type-tag ${cls.type}">${classType}</span>
-                        </p>
-                        <div class="class-item-details">
-                            <p>${formatSchedule(cls.day, cls.period)}</p>
-                            <p>Faixa etária: ${formatGrades(cls.grades)}</p>
-                            <p>Polo: ${cls.polo_name || 'Não especificado'}</p>
+    if (div) {
+        div.innerHTML = filteredClasses.length === 0 ?
+            '<div class="text-center py-4 text-gray-500">Nenhuma turma disponível</div>' :
+            filteredClasses.map(cls => {
+                const className = extractClassName(cls.name);
+                const capitalizedName = capitalizeFirstLetter(className);
+                const classType = cls.type === 'cognitiva' ? 'Cognitiva' : 'Motora';
+                return `
+                    <div class="flex items-center justify-between p-4 border border-gray-200 rounded-md hover:bg-gray-50 cursor-pointer" onclick="selectClass('${cls.id}')">
+                        <div>
+                            <p class="font-medium inline-flex items-center">
+                                ${capitalizedName}
+                                <span class="class-type-tag ${cls.type}">${classType}</span>
+                            </p>
+                            <div class="class-item-details">
+                                <p>${formatSchedule(cls.day, cls.period)}</p>
+                                <p>Faixa etária: ${formatGrades(cls.grades)}</p>
+                                <p>Polo: ${cls.polo_name || 'Não especificado'}</p>
+                            </div>
                         </div>
+                        <div class="text-sm text-gray-500">${cls.enrollmentCount}/${cls.capacity}</div>
                     </div>
-                    <div class="text-sm text-gray-500">${cls.enrollmentCount}/${cls.capacity}</div>
-                </div>
-            `;
-        }).join('');
-    lucide.createIcons();
+                `;
+            }).join('');
+        lucide.createIcons();
+    }
 }
 
 function selectClass(classId) {
     selectedClass = classes.find(cls => cls.id === classId);
-    document.getElementById('close-selected-class').classList.remove('hidden');
-    document.getElementById('student-search-available').disabled = false;
-    document.getElementById('student-unit-filter').disabled = false;
-    document.getElementById('enrolled-students-wrapper').classList.remove('hidden');
+    const closeButton = document.getElementById('close-selected-class');
+    const searchInput = document.getElementById('student-search-available');
+    const unitFilter = document.getElementById('student-unit-filter');
+    const enrolledWrapper = document.getElementById('enrolled-students-wrapper');
+    const title = document.getElementById('selected-class-title');
 
-    const classType = selectedClass.type === 'cognitiva' ? 'Cognitiva' : 'Motora';
-    const className = extractClassName(selectedClass.name);
-    const capitalizedName = capitalizeFirstLetter(className);
-    document.getElementById('selected-class-title').innerHTML = `
-        ${capitalizedName}
-        <span class="class-type-tag ${selectedClass.type}">${classType}</span>
-    `;
+    if (closeButton) closeButton.classList.remove('hidden');
+    if (searchInput) searchInput.disabled = false;
+    if (unitFilter) unitFilter.disabled = false;
+    if (enrolledWrapper) enrolledWrapper.classList.remove('hidden');
+
+    if (title && selectedClass) {
+        const classType = selectedClass.type === 'cognitiva' ? 'Cognitiva' : 'Motora';
+        const className = extractClassName(selectedClass.name);
+        const capitalizedName = capitalizeFirstLetter(className);
+        title.innerHTML = `
+            ${capitalizedName}
+            <span class="class-type-tag ${selectedClass.type}">${classType}</span>
+        `;
+    }
+
     updateSelectedClassDetails();
     filterAvailableStudents();
     renderEnrolledStudents();
@@ -380,22 +490,25 @@ function selectClass(classId) {
 
 function deselectClass() {
     selectedClass = null;
-    document.getElementById('close-selected-class').classList.add('hidden');
-    document.getElementById('student-search-available').disabled = true;
-    document.getElementById('student-unit-filter').disabled = true;
-    document.getElementById('enrolled-students-wrapper').classList.add('hidden');
-    document.getElementById('selected-class-title').textContent = 'Nenhuma turma selecionada';
-    document.getElementById('selected-class-details').innerHTML = `
-        <p>Selecione uma turma para visualizar os detalhes.</p>
-    `;
-    document.getElementById('available-students').innerHTML = `
-        <div class="text-center py-4 text-gray-500">Nenhuma turma selecionada.</div>
-    `;
-    document.getElementById('enrolled-students').innerHTML = `
-        <div class="text-center py-4 text-gray-500">Nenhuma turma selecionada.</div>
-    `;
+    const closeButton = document.getElementById('close-selected-class');
+    const searchInput = document.getElementById('student-search-available');
+    const unitFilter = document.getElementById('student-unit-filter');
+    const enrolledWrapper = document.getElementById('enrolled-students-wrapper');
+    const title = document.getElementById('selected-class-title');
+    const details = document.getElementById('selected-class-details');
+    const availableStudents = document.getElementById('available-students');
+    const enrolledStudents = document.getElementById('enrolled-students');
     const unitFilterSelect = document.getElementById('student-unit-filter');
-    unitFilterSelect.innerHTML = '<option value="">Filtrar por unidade</option>';
+
+    if (closeButton) closeButton.classList.add('hidden');
+    if (searchInput) searchInput.disabled = true;
+    if (unitFilter) unitFilter.disabled = true;
+    if (enrolledWrapper) enrolledWrapper.classList.add('hidden');
+    if (title) title.textContent = 'Nenhuma turma selecionada';
+    if (details) details.innerHTML = '<p>Selecione uma turma para visualizar os detalhes.</p>';
+    if (availableStudents) availableStudents.innerHTML = '<div class="text-center py-4 text-gray-500">Nenhuma turma selecionada.</div>';
+    if (enrolledStudents) enrolledStudents.innerHTML = '<div class="text-center py-4 text-gray-500">Nenhuma turma selecionada.</div>';
+    if (unitFilterSelect) unitFilterSelect.innerHTML = '<option value="">Filtrar por unidade</option>';
     lucide.createIcons();
 }
 
@@ -403,8 +516,8 @@ function filterAvailableStudents() {
     if (!selectedClass) {
         return;
     }
-    const search = document.getElementById('student-search-available').value.toLowerCase();
-    const unitFilter = document.getElementById('student-unit-filter').value;
+    const search = document.getElementById('student-search-available')?.value.toLowerCase() || '';
+    const unitFilter = document.getElementById('student-unit-filter')?.value || '';
     let acceptedGrades = extractAcceptedGrades(selectedClass.grades);
     const selectedClassName = extractClassName(selectedClass.name).toLowerCase();
 
@@ -466,14 +579,16 @@ function filterAvailableStudents() {
     });
 
     const unitFilterSelect = document.getElementById('student-unit-filter');
-    const currentSelectedUnit = unitFilterSelect.value;
-    const units = [...new Set(potentialStudents.map(student => student.unidade).filter(unit => unit && allowedUnits.includes(unit)))];
-    units.sort();
-    unitFilterSelect.innerHTML = '<option value="">Filtrar por unidade</option>' + 
-        units.map(unit => `<option value="${unit}">${unit}</option>`).join('');
+    if (unitFilterSelect) {
+        const currentSelectedUnit = unitFilterSelect.value;
+        const units = [...new Set(potentialStudents.map(student => student.unidade).filter(unit => unit && allowedUnits.includes(unit)))];
+        units.sort();
+        unitFilterSelect.innerHTML = '<option value="">Filtrar por unidade</option>' + 
+            units.map(unit => `<option value="${unit}">${unit}</option>`).join('');
 
-    if (currentSelectedUnit && units.includes(currentSelectedUnit)) {
-        unitFilterSelect.value = currentSelectedUnit;
+        if (currentSelectedUnit && units.includes(currentSelectedUnit)) {
+            unitFilterSelect.value = currentSelectedUnit;
+        }
     }
 
     const availableStudents = unitFilter ?
@@ -481,22 +596,24 @@ function filterAvailableStudents() {
         potentialStudents;
 
     const div = document.getElementById('available-students');
-    div.innerHTML = availableStudents.length === 0 ?
-        '<div class="text-center py-4 text-gray-500">Nenhuma turma selecionada.</div>' :
-        availableStudents.map(student => `
-            <div class="flex items-center justify-between p-3 border rounded-md hover:bg-gray-50">
-                <div>
-                    <p class="font-medium">${student.name}</p>
-                    <p class="text-sm text-gray-500">Unidade: ${student.unidade || 'Não especificado'}</p>
-                    <p class="text-sm text-gray-500">${student.etapa}</p>
+    if (div) {
+        div.innerHTML = availableStudents.length === 0 ?
+            '<div class="text-center py-4 text-gray-500">Nenhuma turma selecionada.</div>' :
+            availableStudents.map(student => `
+                <div class="flex items-center justify-between p-3 border rounded-md hover:bg-gray-50">
+                    <div>
+                        <p class="font-medium">${student.name}</p>
+                        <p class="text-sm text-gray-500">Unidade: ${student.unidade || 'Não especificado'}</p>
+                        <p class="text-sm text-gray-500">${student.etapa}</p>
+                    </div>
+                    <button onclick="enrollStudent('${student.id}', this)" class="bg-blue-600 text-white px-3 py-1 rounded-md flex items-center">
+                        <i data-lucide="plus" class="h-4 w-4 mr-1"></i>
+                        Matricular
+                    </button>
                 </div>
-                <button onclick="enrollStudent('${student.id}')" class="bg-blue-600 text-white px-3 py-1 rounded-md hover:bg-blue-700 flex items-center">
-                    <i data-lucide="plus" class="h-4 w-4 mr-1"></i>
-                    Matricular
-                </button>
-            </div>
-        `).join('');
-    lucide.createIcons();
+            `).join('');
+        lucide.createIcons();
+    }
 }
 
 function renderEnrolledStudents() {
@@ -513,6 +630,10 @@ function renderEnrolledStudents() {
         return;
     }
 
+    // Atualizar o enrollmentCount com base no número real de matrículas
+    selectedClass.enrollmentCount = enrollments.filter(e => String(e.classId) === String(selectedClass.id)).length;
+    console.log('Atualizando enrollmentCount:', { classId: selectedClass.id, enrollmentCount: selectedClass.enrollmentCount });
+
     div.innerHTML = enrolledStudents.length === 0 ?
         '<div class="text-center py-4 text-gray-500">Nenhum aluno matriculado nesta turma.</div>' :
         enrolledStudents.map(student => `
@@ -522,18 +643,20 @@ function renderEnrolledStudents() {
                     <p class="text-sm text-gray-500">Unidade: ${student.unidade || 'Não especificado'}</p>
                     <p class="text-sm text-gray-500">${student.etapa}</p>
                 </div>
-                <button onclick="unenrollStudent('${student.id}')" class="bg-red-600 text-white px-3 py-1 rounded-md hover:bg-blue-700 flex items-center">
+                <button onclick="unenrollStudent('${student.id}', this)" class="bg-red-600 text-white px-3 py-1 rounded-md flex items-center">
                     <i data-lucide="trash-2" class="h-4 w-4 mr-1"></i>
                     Remover
                 </button>
             </div>
         `).join('');
 
+    updateSelectedClassDetails();
     lucide.createIcons();
 }
 
-async function enrollStudent(studentId) {
+async function enrollStudent(studentId, button) {
     try {
+        toggleButtonsState(true, button);
         const response = await retryFetch('/api/matriculas', {
             method: 'POST',
             headers: { 'Content-Type': 'application/json' },
@@ -541,45 +664,42 @@ async function enrollStudent(studentId) {
             credentials: 'include'
         });
         const newEnrollment = response;
-        console.log('Nova matrícula criada:', newEnrollment); // Log para depuração
+        console.log('Nova matrícula criada:', newEnrollment);
 
-        const tempEnrollment = {
-            id: newEnrollment.id,
-            studentId: String(newEnrollment.studentId),
-            classId: String(newEnrollment.classId),
-            required: selectedClass.type === 'cognitiva'
-        };
-        enrollments.push(tempEnrollment);
-
-        selectedClass.enrollmentCount += 1;
-
-        renderEnrolledStudents();
-
-        await delay(1000);
-        const newEnrollments = await refreshEnrollments();
-
-        const enrollmentExists = newEnrollments.some(e => e.id === newEnrollment.id);
-        if (!enrollmentExists) {
-            enrollments = [...newEnrollments, tempEnrollment];
-        } else {
-            enrollments = newEnrollments;
+        // Verificar se newEnrollment é válido
+        if (!newEnrollment || !newEnrollment.id) {
+            throw new Error('Resposta inválida do backend: matrícula não contém ID');
         }
 
-        renderEnrolledStudents();
-        filterAvailableStudents();
-        filterClasses();
-        updateSelectedClassDetails();
+        // Invalidar caches
+        invalidateCaches();
+
+        // Recarregar dados globais
+        await loadData();
+
+        // Re-selecionar a turma atual
+        if (selectedClass) {
+            selectClass(selectedClass.id);
+        }
+
         showToast('Aluno matriculado com sucesso!', 'success', 'check-circle');
-        lucide.createIcons();
     } catch (error) {
         console.error('Erro ao matricular aluno:', error.message);
         showToast('Erro: ' + error.message, 'error', 'alert-circle');
+        // Mesmo com erro, recarregar dados para garantir consistência
+        await loadData();
+        if (selectedClass) {
+            selectClass(selectedClass.id);
+        }
+    } finally {
+        toggleButtonsState(false, button);
         lucide.createIcons();
     }
 }
 
-async function unenrollStudent(studentId) {
+async function unenrollStudent(studentId, button) {
     try {
+        toggleButtonsState(true, button);
         const enrollment = enrollments.find(e => e.studentId === studentId && e.classId === selectedClass.id);
         if (!enrollment) throw new Error('Matrícula não encontrada');
         const response = await retryFetch(`/api/matriculas/${enrollment.id}`, {
@@ -587,19 +707,30 @@ async function unenrollStudent(studentId) {
             headers: { 'Content-Type': 'application/json' },
             credentials: 'include'
         });
-        console.log('Matrícula removida:', enrollment.id); // Log para depuração
-        await delay(1000);
-        enrollments = await refreshEnrollments();
-        selectedClass.enrollmentCount -= 1;
-        renderEnrolledStudents();
-        filterAvailableStudents();
-        filterClasses();
-        updateSelectedClassDetails();
-        showToast('Aluno removido da turma com sucesso!', 'error', 'trash-2');
-        lucide.createIcons();
+        console.log('Matrícula removida:', enrollment.id);
+
+        // Invalidar caches
+        invalidateCaches();
+
+        // Recarregar dados globais
+        await loadData();
+
+        // Re-selecionar a turma atual
+        if (selectedClass) {
+            selectClass(selectedClass.id);
+        }
+
+        showToast('Aluno removido da turma com sucesso!', 'success', 'trash-2');
     } catch (error) {
         console.error('Erro ao remover matrícula:', error.message);
         showToast('Erro: ' + error.message, 'error', 'alert-circle');
+        // Mesmo com erro, recarregar dados para verificar o estado real
+        await loadData();
+        if (selectedClass) {
+            selectClass(selectedClass.id);
+        }
+    } finally {
+        toggleButtonsState(false, button);
         lucide.createIcons();
     }
 }
@@ -609,32 +740,39 @@ function updateSelectedClassDetails() {
     const classType = selectedClass.type === 'cognitiva' ? 'Cognitiva' : 'Motora';
     const className = extractClassName(selectedClass.name);
     const capitalizedName = capitalizeFirstLetter(className);
-    document.getElementById('selected-class-title').innerHTML = `
-        ${capitalizedName}
-        <span class="class-type-tag ${selectedClass.type}">${classType}</span>
-    `;
-    document.getElementById('selected-class-details').innerHTML = `
-        <div class="detail-item">
-            <i data-lucide="calendar"></i>
-            <span>${formatSchedule(selectedClass.day, selectedClass.period, false)}</span>
-        </div>
-        <div class="detail-item">
-            <i data-lucide="clock"></i>
-            <span>${formatSchedule(selectedClass.day, selectedClass.period).split('(')[1].replace(')', '')}</span>
-        </div>
-        <div class="detail-item">
-            <i data-lucide="graduation-cap"></i>
-            <span>Faixa etária: ${formatGrades(selectedClass.grades)}</span>
-        </div>
-        <div class="detail-item">
-            <i data-lucide="school"></i>
-            <span>Polo: ${selectedClass.polo_name || 'Não especificado'}</span>
-        </div>
-        <div class="detail-item">
-            <i data-lucide="users"></i>
-            <span>Vagas: ${selectedClass.enrollmentCount}/${selectedClass.capacity}</span>
-        </div>
-    `;
+    const title = document.getElementById('selected-class-title');
+    const details = document.getElementById('selected-class-details');
+
+    if (title) {
+        title.innerHTML = `
+            ${capitalizedName}
+            <span class="class-type-tag ${selectedClass.type}">${classType}</span>
+        `;
+    }
+    if (details) {
+        details.innerHTML = `
+            <div class="detail-item">
+                <i data-lucide="calendar"></i>
+                <span>${formatSchedule(selectedClass.day, selectedClass.period, false)}</span>
+            </div>
+            <div class="detail-item">
+                <i data-lucide="clock"></i>
+                <span>${formatSchedule(selectedClass.day, selectedClass.period).split('(')[1].replace(')', '')}</span>
+            </div>
+            <div class="detail-item">
+                <i data-lucide="graduation-cap"></i>
+                <span>Faixa etária: ${formatGrades(selectedClass.grades)}</span>
+            </div>
+            <div class="detail-item">
+                <i data-lucide="school"></i>
+                <span>Polo: ${selectedClass.polo_name || 'Não especificado'}</span>
+            </div>
+            <div class="detail-item">
+                <i data-lucide="users"></i>
+                <span>Vagas: ${selectedClass.enrollmentCount}/${selectedClass.capacity}</span>
+            </div>
+        `;
+    }
     lucide.createIcons();
 }
 
@@ -669,27 +807,32 @@ function showToast(message, type, icon) {
 }
 
 document.addEventListener('DOMContentLoaded', () => {
-    // Adicionar event listeners para os botões
-    document.getElementById('filter-cognitiva').addEventListener('click', () => filterClasses('cognitiva'));
-    document.getElementById('filter-motora').addEventListener('click', () => filterClasses('motora'));
+    console.log('Inicializando Lucide e carregando dados');
+    console.log('Lucide carregada:', typeof lucide, lucide.createIcons);
+    lucide.createIcons();
 
-    // Adicionar event listeners para o input de busca e os selects
-    document.getElementById('class-search').addEventListener('input', () => filterClasses());
-    document.getElementById('day-filter').addEventListener('change', () => filterClasses());
-    document.getElementById('period-filter').addEventListener('change', () => filterClasses());
+    const filterCognitiva = document.getElementById('filter-cognitiva');
+    const filterMotora = document.getElementById('filter-motora');
+    const classSearch = document.getElementById('class-search');
+    const dayFilter = document.getElementById('day-filter');
+    const periodFilter = document.getElementById('period-filter');
     const poloFilter = document.getElementById('polo-filter');
     const gradeFilter = document.getElementById('grade-filter');
+    const closeSelectedClass = document.getElementById('close-selected-class');
+    const studentSearch = document.getElementById('student-search-available');
+    const studentUnitFilter = document.getElementById('student-unit-filter');
+
+    if (filterCognitiva) filterCognitiva.addEventListener('click', () => filterClasses('cognitiva'));
+    if (filterMotora) filterMotora.addEventListener('click', () => filterClasses('motora'));
+    if (classSearch) classSearch.addEventListener('input', () => filterClasses());
+    if (dayFilter) dayFilter.addEventListener('change', () => filterClasses());
+    if (periodFilter) periodFilter.addEventListener('change', () => filterClasses());
     if (poloFilter) poloFilter.addEventListener('change', () => filterClasses());
     if (gradeFilter) gradeFilter.addEventListener('change', () => filterClasses());
+    if (closeSelectedClass) closeSelectedClass.addEventListener('click', deselectClass);
+    if (studentSearch) studentSearch.addEventListener('input', filterAvailableStudents);
+    if (studentUnitFilter) studentUnitFilter.addEventListener('change', filterAvailableStudents);
 
-    // Adicionar event listener para o botão de fechar
-    document.getElementById('close-selected-class').addEventListener('click', deselectClass);
-
-    // Adicionar event listeners para os inputs de busca e filtro por unidade de alunos disponíveis
-    document.getElementById('student-search-available').addEventListener('input', filterAvailableStudents);
-    document.getElementById('student-unit-filter').addEventListener('change', filterAvailableStudents);
-
-    // Carregar dados
     loadData();
 });
 

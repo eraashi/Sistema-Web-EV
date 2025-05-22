@@ -4,11 +4,13 @@ let enrollments = [];
 let activeClassesWithStudents = [];
 
 const retryFetch = async (url, options, retries = 2, delay = 500) => {
-    const cacheKey = `cache_${url}`;
+    // Incluir userPoloId na chave de cache
+    const cacheKey = `cache_${url}:${userPoloId || 'no_polo'}`;
     const cached = localStorage.getItem(cacheKey);
     if (cached) {
         const { data, timestamp } = JSON.parse(cached);
-        if (Date.now() - timestamp < 10000) { // 10s TTL
+        if (Date.now() - timestamp < 300000) { // 5 minutos TTL (300.000 ms)
+            console.log(`Cache local encontrado para ${cacheKey}:`, data);
             return data;
         }
     }
@@ -20,23 +22,11 @@ const retryFetch = async (url, options, retries = 2, delay = 500) => {
                 throw new Error(`Erro HTTP! Status: ${response.status}`);
             }
             const data = await response.json();
-            // Armazenar apenas turmas_ativas e polo_count
-            if (url.includes('/api/dashboard_data')) {
-                const slimData = {
-                    turmas_ativas: data.turmas_ativas,
-                    polo_count: data.polo_count
-                };
-                try {
-                    localStorage.setItem(cacheKey, JSON.stringify({ data: slimData, timestamp: Date.now() }));
-                } catch (e) {
-                    console.warn('Erro ao salvar no localStorage:', e.message);
-                }
-            } else {
-                try {
-                    localStorage.setItem(cacheKey, JSON.stringify({ data, timestamp: Date.now() }));
-                } catch (e) {
-                    console.warn('Erro ao salvar no localStorage:', e.message);
-                }
+            try {
+                localStorage.setItem(cacheKey, JSON.stringify({ data, timestamp: Date.now() }));
+                console.log(`Dados salvos no cache local para ${cacheKey}:`, data);
+            } catch (e) {
+                console.warn('Erro ao salvar no localStorage:', e.message);
             }
             return data;
         } catch (error) {
@@ -62,40 +52,123 @@ async function loadData() {
         // Flag para controlar renderização
         let isRendered = false;
 
-        // Tentar renderizar dados em cache apenas se válidos
-        const cacheKey = 'cache_/api/dashboard_data';
+        // Obter turno e dia atuais para validação do cache
+        const currentPeriod = getCurrentPeriod();
+        const currentDay = getCurrentDay();
+
+        // 1. Verificar primeiro os dados pré-carregados no sessionStorage
+        const preCacheKey = `precache:/api/dashboard_data:${userPoloId || 'no_polo'}`;
+        const preCached = sessionStorage.getItem(preCacheKey);
+        if (preCached) {
+            try {
+                const { data, timestamp, period: cachedPeriod, day: cachedDay } = JSON.parse(preCached);
+                console.log('Dados pré-carregados encontrados:', {
+                    turmas_length: data.turmas?.length || 0,
+                    alunos_length: data.alunos?.data?.length || 0,
+                    turmas_ativas_length: data.turmas_ativas?.turmas?.length || 0,
+                    polo_count: data.polo_count?.total_alunos_polo || 0,
+                    cachedPeriod,
+                    cachedDay
+                });
+
+                // Validar se os dados pré-carregados são completos e correspondem ao turno/dia atual
+                if (data && 
+                    Array.isArray(data.turmas) && data.turmas.length > 0 && 
+                    Array.isArray(data.alunos?.data) && data.alunos.data.length > 0 && 
+                    Array.isArray(data.turmas_ativas?.turmas) && 
+                    data.polo_count && typeof data.polo_count.total_alunos_polo === 'number' &&
+                    cachedPeriod === currentPeriod && cachedDay === currentDay) {
+                    students = data.alunos.data;
+                    classes = data.turmas;
+                    enrollments = data.matriculas || [];
+                    activeClassesWithStudents = data.turmas_ativas.turmas || [];
+                    console.log('Pré-cache válido usado:', {
+                        classes_length: classes.length,
+                        students_length: students.length,
+                        activeClasses_length: activeClassesWithStudents.length,
+                        polo_count: data.polo_count.total_alunos_polo
+                    });
+
+                    isRendered = true;
+                    // Atualizar total-students com base no cargo
+                    if (currentUserRole === 'admin' || currentUserRole === 'secretaria') {
+                        console.log(`Exibindo total de alunos para admin/secretaria: ${students.length}`);
+                        document.getElementById('total-students').textContent = students.length;
+                    } else {
+                        console.log(`Exibindo total de alunos para polo ${userPoloId}: ${data.polo_count.total_alunos_polo}`);
+                        document.getElementById('total-students').textContent = data.polo_count.total_alunos_polo;
+                    }
+                    updateDashboard();
+
+                    // Limpar o pré-cache após uso
+                    sessionStorage.removeItem(preCacheKey);
+                    return; // Não precisamos buscar dados frescos
+                } else {
+                    console.warn('Pré-cache inválido, incompleto ou turno/dia não correspondem:', {
+                        turmas_valid: Array.isArray(data.turmas) && data.turmas.length > 0,
+                        alunos_valid: Array.isArray(data.alunos?.data) && data.alunos.data.length > 0,
+                        turmas_ativas_valid: Array.isArray(data.turmas_ativas?.turmas),
+                        polo_count_valid: data.polo_count && typeof data.polo_count.total_alunos_polo === 'number',
+                        period_match: cachedPeriod === currentPeriod,
+                        day_match: cachedDay === currentDay
+                    });
+                    sessionStorage.removeItem(preCacheKey); // Limpar pré-cache corrompido
+                }
+            } catch (e) {
+                console.warn('Erro ao processar pré-cache do sessionStorage:', e.message);
+                sessionStorage.removeItem(preCacheKey); // Limpar pré-cache corrompido
+            }
+        } else {
+            console.log('Nenhum dado pré-carregado encontrado no sessionStorage');
+        }
+
+        // 2. Se não houver pré-cache válido, verificar o cache do localStorage
+        const cacheKey = `cache_/api/dashboard_data:${userPoloId || 'no_polo'}`;
         const cached = localStorage.getItem(cacheKey);
         if (cached) {
             try {
-                const { data, timestamp } = JSON.parse(cached);
-                console.log('Dados do cache:', { 
+                const { data, timestamp, period: cachedPeriod, day: cachedDay } = JSON.parse(cached);
+                console.log('Dados do cache local:', { 
                     turmas_length: data.turmas?.length || 0,
                     alunos_length: data.alunos?.data?.length || 0,
-                    turmas_ativas_length: data.turmas_ativas?.turmas?.length || 0
-                }); // Log para depuração
-                if (Date.now() - timestamp < 10000 && 
+                    turmas_ativas_length: data.turmas_ativas?.turmas?.length || 0,
+                    polo_count: data.polo_count?.total_alunos_polo || 0,
+                    cachedPeriod,
+                    cachedDay
+                });
+
+                if (Date.now() - timestamp < 300000 && 
                     data && 
                     Array.isArray(data.turmas) && data.turmas.length > 0 && 
-                    Array.isArray(data.alunos?.data) && data.alunos.data.length > 0) {
+                    Array.isArray(data.alunos?.data) && data.alunos.data.length > 0 &&
+                    cachedPeriod === currentPeriod && cachedDay === currentDay) {
                     students = data.alunos.data;
                     classes = data.turmas;
                     enrollments = data.matriculas || [];
                     activeClassesWithStudents = data.turmas_ativas?.turmas || [];
-                    console.log('Cache válido usado:', {
+                    console.log('Cache local válido usado:', {
                         classes_length: classes.length,
                         students_length: students.length,
-                        activeClasses_length: activeClassesWithStudents.length
-                    }); // Log para depuração
+                        activeClasses_length: activeClassesWithStudents.length,
+                        polo_count: data.polo_count.total_alunos_polo
+                    });
+
                     isRendered = true;
-                    document.getElementById('total-students').textContent = students.length;
-                    if (currentUserRole === 'diretor' || currentUserRole === 'coordenador' || currentUserRole === 'monitor') {
-                        document.getElementById('polo-students').textContent = data.polo_count?.total_alunos_polo || 0;
+                    // Atualizar total-students com base no cargo
+                    if (currentUserRole === 'admin' || currentUserRole === 'secretaria') {
+                        console.log(`Exibindo total de alunos para admin/secretaria: ${students.length}`);
+                        document.getElementById('total-students').textContent = students.length;
+                    } else {
+                        console.log(`Exibindo total de alunos para polo ${userPoloId}: ${data.polo_count.total_alunos_polo}`);
+                        document.getElementById('total-students').textContent = data.polo_count.total_alunos_polo;
                     }
                     updateDashboard();
                 } else {
-                    console.warn('Cache inválido ou incompleto, limpando:', {
+                    console.warn('Cache local inválido, incompleto ou turno/dia não correspondem:', {
                         turmas_valid: Array.isArray(data.turmas) && data.turmas.length > 0,
-                        alunos_valid: Array.isArray(data.alunos?.data) && data.alunos.data.length > 0
+                        alunos_valid: Array.isArray(data.alunos?.data) && data.alunos.data.length > 0,
+                        period_match: cachedPeriod === currentPeriod,
+                        day_match: cachedDay === currentDay
                     });
                     localStorage.removeItem(cacheKey); // Limpar cache corrompido
                 }
@@ -105,14 +178,15 @@ async function loadData() {
             }
         }
 
-        // Buscar dados frescos
+        // 3. Buscar dados frescos se não houver cache válido
+        console.log('Buscando dados frescos de /api/dashboard_data');
         const data = await retryFetch('/api/dashboard_data', { credentials: 'include' });
         console.log('Resposta fresca de /api/dashboard_data:', { 
             turmas_length: data.turmas?.length || 0,
             alunos_length: data.alunos?.data?.length || 0,
             turmas_ativas_length: data.turmas_ativas?.turmas?.length || 0,
-            turmas_sample: data.turmas?.slice(0, 2) || [] // Amostra das primeiras turmas
-        }); // Log para depuração
+            polo_count: data.polo_count?.total_alunos_polo || 0
+        });
 
         // Atualizar variáveis com dados frescos
         students = Array.isArray(data.alunos?.data) ? data.alunos.data : [];
@@ -122,13 +196,29 @@ async function loadData() {
         console.log('Dados frescos processados:', {
             classes_length: classes.length,
             students_length: students.length,
-            activeClasses_length: activeClassesWithStudents.length
-        }); // Log para depuração
+            activeClasses_length: activeClassesWithStudents.length,
+            polo_count: data.polo_count.total_alunos_polo
+        });
 
-        // Atualizar elementos críticos
-        document.getElementById('total-students').textContent = students.length;
-        if (currentUserRole === 'diretor' || currentUserRole === 'coordenador' || currentUserRole === 'monitor') {
-            document.getElementById('polo-students').textContent = data.polo_count?.total_alunos_polo || 0;
+        // Salvar no cache com informações de turno e dia
+        try {
+            localStorage.setItem(cacheKey, JSON.stringify({ 
+                data, 
+                timestamp: Date.now(), 
+                period: currentPeriod, 
+                day: currentDay 
+            }));
+        } catch (e) {
+            console.warn('Erro ao salvar no localStorage:', e.message);
+        }
+
+        // Atualizar total-students com base no cargo
+        if (currentUserRole === 'admin' || currentUserRole === 'secretaria') {
+            console.log(`Exibindo total de alunos para admin/secretaria: ${students.length}`);
+            document.getElementById('total-students').textContent = students.length;
+        } else {
+            console.log(`Exibindo total de alunos para polo ${userPoloId}: ${data.polo_count.total_alunos_polo}`);
+            document.getElementById('total-students').textContent = data.polo_count.total_alunos_polo;
         }
 
         // Renderizar apenas se necessário (evitar sobrescrita com cache)
@@ -209,7 +299,7 @@ async function updateDashboard() {
         classes_length: classes.length,
         students_length: students.length,
         activeClasses_length: activeClassesWithStudents.length
-    }); // Log para depuração
+    });
 
     document.getElementById('total-classes').textContent = activeClassesWithStudents.length;
 
@@ -217,7 +307,6 @@ async function updateDashboard() {
     const avgCapacity = activeClassesWithStudents.length > 0 ? (totalCapacity / activeClassesWithStudents.length).toFixed(1) : 0;
     document.getElementById('avg-capacity').textContent = `Capacidade média: ${avgCapacity} alunos`;
 
-    // Contar turmas cognitivas e motoras do polo
     const cognitiveClasses = classes.filter(cls => cls.type?.toLowerCase() === 'cognitiva');
     const motorClasses = classes.filter(cls => cls.type?.toLowerCase() === 'motora');
     document.getElementById('cognitive-classes').textContent = cognitiveClasses.length;
@@ -226,10 +315,9 @@ async function updateDashboard() {
         cognitivas: cognitiveClasses.length,
         motoras: motorClasses.length,
         tipos_encontrados: [...new Set(classes.map(cls => cls.type))],
-        classes_sample: classes.slice(0, 2) // Amostra para verificar formato
-    }); // Log para depuração
+        classes_sample: classes.slice(0, 2)
+    });
 
-    // Turmas ativas do dia
     const activeCognitiveClasses = activeClassesWithStudents.filter(cls => cls.type?.toLowerCase() === 'cognitiva');
     const activeMotorClasses = activeClassesWithStudents.filter(cls => cls.type?.toLowerCase() === 'motora');
 
@@ -367,5 +455,12 @@ function showToast(message, type, icon) {
 }
 
 document.addEventListener('DOMContentLoaded', () => {
+    // Limpar caches antigos para evitar valores incorretos
+    const oldPreCacheKey = 'precache:/api/dashboard_data';
+    const oldCacheKey = 'cache_/api/dashboard_data';
+    sessionStorage.removeItem(oldPreCacheKey);
+    localStorage.removeItem(oldCacheKey);
+    console.log('Caches antigos limpos:', oldPreCacheKey, oldCacheKey);
+
     loadData();
 });

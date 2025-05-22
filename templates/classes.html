@@ -21,6 +21,8 @@
     </div>
 </div>
 <div class="bg-white rounded-lg shadow-md overflow-hidden px-6">
+    <!-- Adicionar espaço para controles de paginação antes da tabela -->
+    <div class="pagination-top py-4"></div>
     <table class="min-w-full divide-y divide-gray-200">
         <thead class="bg-gray-50">
             <tr>
@@ -38,6 +40,8 @@
         </thead>
         <tbody id="class-table-body" class="divide-y divide-gray-200"></tbody>
     </table>
+    <!-- Espaço para controles de paginação após a tabela -->
+    <div class="pagination py-4"></div>
 </div>
 
 <!-- Container para Toasts -->
@@ -200,6 +204,11 @@
             </div>
         </form>
     </div>
+</div>
+
+<!-- Loading Overlay -->
+<div id="loading-overlay" class="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 hidden">
+    <div class="w-12 h-12 border-4 border-blue-600 border-t-transparent rounded-full animate-spin"></div>
 </div>
 
 <!-- Elemento invisível para forçar a inclusão da classe bg-purple-100 no Tailwind CSS -->
@@ -503,5 +512,5 @@
     const currentUserRole = "{{ user.cargo }}";
     const userPoloName = "{{ user.polos.nome }}";
 </script>
-<script src="/static/js/classes.js?v=17"></script>
+<script src="/static/js/classes.js?v=21"></script>
 {% endblock %}

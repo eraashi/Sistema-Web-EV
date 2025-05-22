@@ -1,3 +1,5 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
 {% extends 'base.html' %}
 
 {% block title %}Estatísticas{% endblock %}
@@ -32,19 +34,19 @@
 
     <!-- Cards de Resumo -->
     <div class="grid grid-cols-1 md:grid-cols-4 gap-6 mb-6">
-        <div class="bg-white p-4 rounded-lg shadow-md cursor-pointer" onclick="showTab('distribuicao')">
+        <div class="bg-white p-4 rounded-lg shadow-md cursor-pointer" data-tab="distribuicao">
             <h3 class="text-sm font-medium text-gray-500 mb-2">Total de Alunos</h3>
             <p id="total-alunos" class="text-2xl font-bold">0</p>
         </div>
-        <div class="bg-white p-4 rounded-lg shadow-md cursor-pointer" onclick="showTab('frequencia')">
+        <div class="bg-white p-4 rounded-lg shadow-md cursor-pointer" data-tab="frequencia">
             <h3 class="text-sm font-medium text-gray-500 mb-2">Média de Frequência</h3>
             <p id="media-frequencia" class="text-2xl font-bold">0%</p>
         </div>
-        <div class="bg-white p-4 rounded-lg shadow-md cursor-pointer" onclick="showTab('movimentacao')">
+        <div class="bg-white p-4 rounded-lg shadow-md cursor-pointer" data-tab="movimentacao">
             <h3 class="text-sm font-medium text-gray-500 mb-2">Alunos Novos (2025)</h3>
             <p id="alunos-novos" class="text-2xl font-bold">0</p>
         </div>
-        <div class="bg-white p-4 rounded-lg shadow-md cursor-pointer" onclick="showTab('movimentacao')">
+        <div class="bg-white p-4 rounded-lg shadow-md cursor-pointer" data-tab="movimentacao">
             <h3 class="text-sm font-medium text-gray-500 mb-2">Trocas de Turma</h3>
             <p id="trocas-turma" class="text-2xl font-bold">0</p>
         </div>
@@ -53,11 +55,11 @@
     <!-- Abas -->
     <div class="mb-6">
         <div class="flex space-x-2 flex-wrap">
-            <button onclick="showTab('distribuicao')" class="bg-blue-600 text-white px-4 py-2 rounded-md hover:bg-blue-700">Distribuição</button>
-            <button onclick="showTab('frequencia')" class="bg-gray-200 text-gray-700 px-4 py-2 rounded-md hover:bg-gray-300">Frequência</button>
-            <button onclick="showTab('movimentacao')" class="bg-gray-200 text-gray-700 px-4 py-2 rounded-md hover:bg-gray-300">Movimentação</button>
-            <button onclick="showTab('taxa')" class="bg-gray-200 text-gray-700 px-4 py-2 rounded-md hover:bg-gray-300">Taxa de Ocupação Geral</button>
-            <button onclick="showTab('ativas')" class="bg-gray-200 text-gray-700 px-4 py-2 rounded-md hover:bg-gray-300">Turmas Ativas</button>
+            <button data-tab="distribuicao" class="bg-blue-600 text-white px-4 py-2 rounded-md hover:bg-blue-700">Distribuição</button>
+            <button data-tab="frequencia" class="bg-gray-200 text-gray-700 px-4 py-2 rounded-md hover:bg-gray-300">Frequência</button>
+            <button data-tab="movimentacao" class="bg-gray-200 text-gray-700 px-4 py-2 rounded-md hover:bg-gray-300">Movimentação</button>
+            <button data-tab="taxa" class="bg-gray-200 text-gray-700 px-4 py-2 rounded-md hover:bg-gray-300">Taxa de Ocupação Geral</button>
+            <button data-tab="ativas" class="bg-gray-200 text-gray-700 px-4 py-2 rounded-md hover:bg-gray-300">Turmas Ativas</button>
         </div>
     </div>
 
@@ -186,24 +188,5 @@
 <script src="https://cdn.jsdelivr.net/npm/flatpickr@4.6.13/dist/flatpickr.min.js"></script>
 <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/flatpickr@4.6.13/dist/flatpickr.min.css">
 <script src="/static/js/reports.js"></script>
-<script>
-    function showTab(tabId) {
-        ['distribuicao', 'frequencia', 'movimentacao', 'taxa', 'ativas'].forEach(id => {
-            document.getElementById(id + '-tab').classList.add('hidden');
-            document.querySelector(`button[onclick="showTab('${id}')"]`).classList.remove('bg-blue-600', 'text-white');
-            document.querySelector(`button[onclick="showTab('${id}')"]`).classList.add('bg-gray-200', 'text-gray-700', 'hover:bg-gray-300');
-        });
-        document.getElementById(tabId + '-tab').classList.remove('hidden');
-        document.querySelector(`button[onclick="showTab('${tabId}')"]`).classList.remove('bg-gray-200', 'text-gray-700', 'hover:bg-gray-300');
-        document.querySelector(`button[onclick="showTab('${tabId}')"]`).classList.add('bg-blue-600', 'text-white', 'hover:bg-blue-700');
-
-        if (tabId === 'frequencia') {
-            renderFrequenciaChart();
-        } else if (tabId === 'movimentacao') {
-            renderMovimentacaoCharts();
-        } else if (tabId === 'distribuicao') {
-            renderDistribuicaoCharts();
-        }
-    }
-</script>
 {% endblock %}
+</html>
