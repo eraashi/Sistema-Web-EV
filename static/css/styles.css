@@ -2,7 +2,7 @@
 body {
     font-family: 'Inter', sans-serif;
     margin: 0;
-    background-color: #1E3A8A; /* Cor da sidebar para preencher o espaço à esquerda */
+    background-color: #1E3A8A;
     overflow-x: hidden;
 }
 
@@ -14,10 +14,10 @@ body {
     display: flex;
     flex-direction: column;
     height: 100vh;
-    position: fixed; /* Fixa a sidebar na viewport */
+    position: fixed;
     top: 0;
     left: 0;
-    z-index: 1000; /* Garante que a sidebar fique acima de outros elementos */
+    z-index: 1000;
 }
 
 /* Estilizar o contêiner pai (flex) */
@@ -28,9 +28,9 @@ body {
 
 /* Estilizar o contêiner principal */
 .container {
-    flex: 1; /* Ocupa o espaço restante */
-    margin-left: 0; /* Remove o padding lateral para telas menores */
-    background-color: #f3f4f6; /* Cor bg-gray-100 do Tailwind */
+    flex: 1;
+    margin-left: 0;
+    background-color: #f3f4f6;
     box-sizing: border-box;
 }
 
@@ -42,47 +42,53 @@ header {
     display: flex;
     justify-content: space-between;
     align-items: center;
-    width: calc(100vw - 16rem); /* Ocupa a largura da viewport menos a sidebar */
+    width: calc(100vw - 16rem);
     position: relative;
-    left: 0; /* Alinha com a borda esquerda do .container */
-    z-index: 999; /* Garante que o header fique abaixo da sidebar, mas acima do conteúdo */
+    left: 0;
+    z-index: 999;
 }
 
 /* Ajustar o título do header */
 header h1 {
-    margin-left: 0; /* Remove o deslocamento, para alinhar à esquerda do espaço disponível */
+    margin-left: 0;
+}
+
+/* Mover o "Olá," e o botão "Sair" para a esquerda (em direção ao centro) */
+header .flex.items-center.space-x-2 {
+    position: relative;
+    left: -1rem; /* Move o div 16 pixels para a esquerda */
 }
 
 /* Estilizar o Conteúdo Principal */
 main {
     flex: 1;
-    width: calc(100vw - 16rem - 0.5rem); /* Compensa o padding-left adicional dos contêineres filhos */
-    padding: 1rem 0; /* Remove padding lateral, mantém padding vertical */
+    width: calc(100vw - 16rem - 0.5rem);
+    padding: 1rem 0;
     box-sizing: border-box;
 }
 
 /* Estilizar a seção de login */
 .login-section {
-    margin-left: 16rem; /* Alinha o conteúdo à direita da sidebar */
-    padding: 2rem 1.5rem; /* Mantém padding simétrico */
+    margin-left: 16rem;
+    padding: 2rem 1.5rem;
     box-sizing: border-box;
 }
 
 /* Classe para contêineres que devem ocupar toda a largura disponível */
 .full-width-container {
     width: 100%;
-    padding-left: 1.5rem; /* Restaura padding simétrico à esquerda */
-    padding-right: 1.5rem; /* Restaura padding simétrico à direita */
+    padding-left: 1.5rem;
+    padding-right: 1.5rem;
     box-sizing: border-box;
 }
 
 /* Estilizar Cards */
 .card {
     background-color: white;
-    padding: 1rem 1.5rem; /* Mantém padding simétrico */
+    padding: 1rem 1.5rem;
     border-radius: 0.5rem;
     box-shadow: 0 1px 3px rgba(0, 0, 0, 0.1);
-    width: 100%; /* Garante que cada card ocupe o espaço disponível na coluna */
+    width: 100%;
     box-sizing: border-box;
 }
 
@@ -107,8 +113,8 @@ main {
     background-color: white;
     border-radius: 0.5rem;
     box-shadow: 0 1px 3px rgba(0, 0, 0, 0.1);
-    padding: 1rem 1.5rem; /* Mantém padding simétrico */
-    width: 100%; /* Garante que a seção ocupe toda a largura disponível */
+    padding: 1rem 1.5rem;
+    width: 100%;
     box-sizing: border-box;
 }
 
@@ -134,7 +140,7 @@ thead {
 }
 
 th, td {
-    padding: 0.75rem 1.5rem; /* Mantém padding simétrico */
+    padding: 0.75rem 1.5rem;
     text-align: left;
 }
 
@@ -161,9 +167,9 @@ tr:nth-child(odd) {
 input, select {
     border: 1px solid #D1D5DB;
     border-radius: 0.375rem;
-    padding: 0.5rem 0.75rem; /* Mantém padding simétrico */
+    padding: 0.5rem 0.75rem;
     width: 100%;
-    transition: border-color 0.2s;
+    transition: none !important;
 }
 
 input:focus, select:focus {
@@ -173,7 +179,7 @@ input:focus, select:focus {
 }
 
 button {
-    transition: background-color 0.2s;
+    transition: none !important;
 }
 
 /* Estilizar Etapas (Steps) */
@@ -243,45 +249,40 @@ button {
     max-height: 600px;
     overflow-y: auto;
     padding-left: 1.5rem;
-    padding-right: 1.5rem; /* Restaura padding simétrico */
+    padding-right: 1.5rem;
 }
 
 #active-classes {
     display: grid;
-    grid-template-columns: repeat(auto-fill, minmax(280px, 1fr)); /* Ajusta o grid para ocupar toda a largura */
-    gap: 4px 16px; /* gap-y-1 (4px) e gap-x-4 (16px) */
+    grid-template-columns: repeat(auto-fill, minmax(280px, 1fr));
+    gap: 4px 16px;
     scrollbar-width: thin;
     scrollbar-color: #93c5fd #e5e7eb;
-    width: 100%; /* Garante que o grid ocupe toda a largura */
+    width: 100%;
     padding-left: 1.5rem;
-    padding-right: 1.5rem; /* Restaura padding simétrico */
+    padding-right: 1.5rem;
 }
 
 /* Ajustar o padding interno dos cards para evitar que fiquem colados à borda esquerda */
 #active-classes .card {
-    width: 100%; /* Garante que cada card ocupe o espaço disponível na coluna */
+    width: 100%;
     min-height: 260px;
-    padding: 1.25rem; /* Mantém o padding simétrico */
+    padding: 1.25rem;
     border: 1px solid #93c5fd;
     display: flex;
     flex-direction: column;
     justify-content: space-between;
     box-sizing: border-box;
-    background-color: #f9fafb; /* Fundo ajustado via reports.js */
-    transition: background-color 0.3s ease, box-shadow 0.3s ease;
-}
-
-#active-classes .card:hover {
-    background-color: #e0f2fe; /* Ajustado para hover:bg-blue-50 */
-    box-shadow: 0 4px 12px rgba(0, 0, 0, 0.15); /* Ajustado para hover:shadow-xl */
+    background-color: #f9fafb;
+    transition: none !important;
 }
 
 #active-classes .card .text-gray-600 {
-    color: #1f2937; /* Ajustado via reports.js */
+    color: #1f2937;
 }
 
 #active-classes .card .text-gray-500 {
-    color: #374151; /* Ajustado via reports.js */
+    color: #374151;
 }
 
 /* Estilizar o modal */
@@ -318,11 +319,11 @@ button {
 .filter-grid {
     display: grid !important;
     grid-template-columns: repeat(2, minmax(0, 1fr)) !important;
-    gap: 16px 8px !important; /* Espaço vertical: 16px, horizontal: 8px */
+    gap: 16px 8px !important;
     width: 100% !important;
     min-width: 0 !important;
-    padding-left: 0 !important; /* Remove o padding-left extra */
-    padding-right: 0 !important; /* Remove o padding-right extra */
+    padding-left: 0 !important;
+    padding-right: 0 !important;
 }
 
 /* Estilo específico para os selects dentro da grade de filtros */
@@ -330,9 +331,9 @@ button {
     width: 100% !important;
     min-width: 0 !important;
     box-sizing: border-box !important;
-    padding-left: 0.75rem !important; /* Reduz o padding-left */
-    padding-right: 0.75rem !important; /* Mantém o padding-right padrão */
-    text-indent: 0 !important; /* Remove text-indent */
+    padding-left: 0.75rem !important;
+    padding-right: 0.75rem !important;
+    text-indent: 0 !important;
 }
 
 /* Ajusta o espaço horizontal entre os selects */
@@ -419,7 +420,6 @@ button {
     cursor: pointer !important;
     background-color: #2563eb !important;
     color: #ffffff !important;
-    transition: background-color 0.2s ease-in-out !important;
 }
 
 #available-students button.bg-blue-600 {
@@ -427,16 +427,9 @@ button {
     color: #ffffff !important;
 }
 
-#available-students button.bg-blue-600:hover {
-    background-color: #1d4ed8 !important;
-}
-
-#available-students button.bg-blue-600:disabled,
-#available-students button.bg-blue-600[disabled] {
+#available-students button.bg-blue-600:disabled {
     background-color: #2563eb !important;
-    color: #ffffff !important;
-    opacity: 1 !important;
-    cursor: pointer !important;
+    cursor: not-allowed !important;
 }
 
 #enrolled-students .bg-red-600 {
@@ -444,12 +437,34 @@ button {
     color: #ffffff !important;
 }
 
-#enrolled-students .bg-red-600:hover {
-    background-color: #b91c1c !important;
+#enrolled-students .bg-red-600:disabled {
+    background-color: #dc2626 !important;
+    cursor: not-allowed !important;
 }
 
-#enrolled-students .bg-red-600 i {
+#enrolled-students .bg-red-600 [data-lucide] {
     color: #ffffff !important;
+}
+
+/* Estilização para ícones de carregamento */
+[data-lucide="loader"], [data-lucide="loader-2"] {
+    height: 16px !important;
+    width: 16px !important;
+    color: #ffffff !important;
+    transform-origin: center !important;
+}
+
+[data-lucide="loader"].animate-spin, [data-lucide="loader-2"].animate-spin {
+    animation: spin 1s linear infinite !important;
+}
+
+@keyframes spin {
+    from {
+        transform: rotate(0deg);
+    }
+    to {
+        transform: rotate(360deg);
+    }
 }
 
 /* Estilização da div do meio (Turma Selecionada) */
@@ -469,11 +484,7 @@ button {
     font-size: 12px;
     font-weight: 500;
     color: #ffffff;
-    transition: opacity 0.2s ease-in-out;
-}
-
-#selected-class-title .class-type-tag:hover {
-    opacity: 0.8;
+    transition: none !important;
 }
 
 #selected-class-title .class-type-tag.cognitiva {
@@ -499,7 +510,7 @@ button {
     width: 100%;
 }
 
-#selected-class-details .detail-item i {
+#selected-class-details .detail-item [data-lucide] {
     width: 20px;
     height: 20px;
     color: #6b7280;
@@ -586,83 +597,83 @@ hr.separator {
 /* Dashboard (dashboard.html) */
 main > div.mb-6 {
     padding-left: 1.5rem;
-    padding-right: 1.5rem; /* Restaura padding simétrico */
+    padding-right: 1.5rem;
 }
 
 main > div.mb-6 h2 {
-    margin-left: 0; /* Garante que o texto não fique colado à borda esquerda */
-    margin-right: 0; /* Remove margem extra à direita */
+    margin-left: 0;
+    margin-right: 0;
 }
 
 main .grid.grid-cols-1.md\\:grid-cols-4 {
     padding-left: 1.5rem;
-    padding-right: 1.5rem; /* Restaura padding simétrico */
+    padding-right: 1.5rem;
 }
 
 /* Ajuste específico para a seção de Turmas Ativas no dashboard */
 .bg-white.border.border-blue-400.rounded-lg.shadow-md > .grid {
-    padding-left: 0 !important; /* Remove o padding-left extra para alinhar com o título */
-    padding-right: 0 !important; /* Remove o padding-right extra para alinhar com o título */
+    padding-left: 0 !important;
+    padding-right: 0 !important;
 }
 
 /* Pesquisa de Alunos (student_list.html) */
 main .border.border-blue-400 {
-    padding: 1rem 1.5rem; /* Restaura padding simétrico */
+    padding: 1rem 1.5rem;
 }
 
 main .flex.justify-center.mb-6 {
     padding-left: 1.5rem;
-    padding-right: 1.5rem; /* Restaura padding simétrico */
+    padding-right: 1.5rem;
 }
 
 main .flex.justify-center.mb-6 button {
-    margin-right: 0; /* Remove margem extra à direita */
+    margin-right: 0;
 }
 
 /* Estatísticas (reports.html) */
 main > div.mb-6 {
     padding-left: 1.5rem;
-    padding-right: 1.5rem; /* Restaura padding simétrico */
+    padding-right: 1.5rem;
 }
 
 main > div.mb-6 h2 {
-    margin-right: 0; /* Remove margem extra à direita */
+    margin-right: 0;
 }
 
 #disciplinas-tab, #dias-tab, #taxa-tab {
-    padding: 1rem 1.5rem; /* Restaura padding simétrico */
+    padding: 1rem 1.5rem;
 }
 
 /* Presenças (reports_presences.html) */
 #presences-section {
-    grid-template-columns: repeat(auto-fill, minmax(300px, 1fr)); /* Ajusta o grid para ocupar toda a largura */
+    grid-template-columns: repeat(auto-fill, minmax(300px, 1fr));
     gap: 1.5rem;
     padding-left: 1.5rem;
-    padding-right: 1.5rem; /* Restaura padding simétrico */
+    padding-right: 1.5rem;
 }
 
 /* Ocorrências (reports_occurrences.html) */
 #occurrences-section {
-    grid-template-columns: repeat(auto-fill, minmax(300px, 1fr)); /* Ajusta o grid para ocupar toda a largura */
+    grid-template-columns: repeat(auto-fill, minmax(300px, 1fr));
     gap: 1.5rem;
     padding-left: 1.5rem;
-    padding-right: 1.5rem; /* Restaura padding simétrico */
+    padding-right: 1.5rem;
 }
 
 /* Enturmar Alunos (enrollment.html) */
 .enrollment-container {
     padding-left: 1.5rem !important;
-    padding-right: 1.5rem !important; /* Restaura padding simétrico */
+    padding-right: 1.5rem !important;
 }
 
 .enrollment-container .border.border-blue-400 {
-    padding: 1rem 1.5rem; /* Restaura padding simétrico */
+    padding: 1rem 1.5rem;
 }
 
 /* Gerenciamento de Turmas (classes.html) */
 main .bg-white.rounded-lg.shadow-md.overflow-hidden {
     padding-left: 1.5rem;
-    padding-right: 1.5rem; /* Restaura padding simétrico */
+    padding-right: 1.5rem;
 }
 
 /* Responsividade */
@@ -670,7 +681,7 @@ main .bg-white.rounded-lg.shadow-md.overflow-hidden {
     .sidebar {
         width: 100%;
         height: auto;
-        position: relative; /* Remove a posição fixa em telas menores */
+        position: relative;
     }
 
     .container {
@@ -678,32 +689,32 @@ main .bg-white.rounded-lg.shadow-md.overflow-hidden {
     }
 
     header {
-        width: 100%; /* Ocupa toda a largura da viewport */
+        width: 100%;
         padding: 1rem;
     }
 
     header h1 {
-        margin-left: 0; /* Remove o deslocamento do título */
+        margin-left: 0;
     }
 
     main {
-        width: 100%; /* Ajusta a largura para telas menores */
-        padding: 1rem; /* Ajusta o padding para telas menores */
+        width: 100%;
+        padding: 1rem;
     }
 
     .login-section {
-        margin-left: 0; /* Remove o margin-left em telas menores */
-        padding: 1rem; /* Mantém padding simétrico */
+        margin-left: 0;
+        padding: 1rem;
     }
 
     .grid {
-        grid-template-columns: repeat(auto-fill, minmax(280px, 1fr)); /* Mantém o comportamento responsivo */
-        padding: 1rem; /* Mantém padding simétrico */
+        grid-template-columns: repeat(auto-fill, minmax(280px, 1fr));
+        padding: 1rem;
     }
 
     #active-classes {
-        grid-template-columns: repeat(auto-fill, minmax(280px, 1fr)); /* Mantém o comportamento responsivo */
-        padding: 1rem; /* Mantém padding simétrico */
+        grid-template-columns: repeat(auto-fill, minmax(280px, 1fr));
+        padding: 1rem;
     }
 
     #active-classes .card {
@@ -714,38 +725,38 @@ main .bg-white.rounded-lg.shadow-md.overflow-hidden {
 
     #presences-section, #occurrences-section {
         grid-template-columns: repeat(auto-fill, minmax(300px, 1fr));
-        padding: 1rem; /* Mantém padding simétrico */
+        padding: 1rem;
     }
 
     .enrollment-container {
-        padding: 1rem !important; /* Mantém padding simétrico */
+        padding: 1rem !important;
     }
 
     .enrollment-container .border.border-blue-400 {
-        padding: 1rem; /* Mantém padding simétrico */
+        padding: 1rem;
     }
 
     main .bg-white.rounded-lg.shadow-md.overflow-hidden {
-        padding: 1rem; /* Mantém padding simétrico */
+        padding: 1rem;
     }
 
     .filter-grid {
-        padding: 1rem !important; /* Mantém padding simétrico */
+        padding: 1rem !important;
     }
 
     main > div.mb-6 {
-        padding: 1rem; /* Mantém padding simétrico */
+        padding: 1rem;
     }
 
     main .border.border-blue-400 {
-        padding: 1rem; /* Mantém padding simétrico */
+        padding: 1rem;
     }
 
     #disciplinas-tab, #dias-tab, #taxa-tab {
-        padding: 1rem; /* Mantém padding simétrico */
+        padding: 1rem;
     }
 
     main .flex.justify-center.mb-6 {
-        padding: 1rem; /* Mantém padding simétrico */
+        padding: 1rem;
     }
 }
