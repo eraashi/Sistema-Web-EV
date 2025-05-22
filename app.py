@@ -19,6 +19,13 @@ app.secret_key = os.getenv('FLASK_SECRET_KEY')
 logging.basicConfig(level=logging.INFO)
 logger = logging.getLogger(__name__)
 
+# Determinar a URL do Redis com base no ambiente
+redis_url = os.getenv('REDIS_URL')
+redis_ssl = True
+if os.getenv('RENDER'):  # Verifica se está rodando no Render
+    redis_url = 'redis://red-d0nniivdiees73dda350:6379'  # URL interna
+    redis_ssl = False  # URL interna não usa TLS
+
 # Configuração da sessão
 app.config['SESSION_TYPE'] = 'redis'
 app.config['SESSION_PERMANENT'] = True
