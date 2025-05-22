@@ -27,20 +27,23 @@ app.config['SESSION_COOKIE_HTTPONLY'] = True
 app.config['SESSION_COOKIE_SAMESITE'] = 'Lax'
 app.config['SESSION_COOKIE_SECURE'] = True
 app.config['SESSION_REDIS'] = redis.Redis.from_url(
-    os.getenv('REDIS_URL'),  # Não usa fallback para localhost
+    os.getenv('REDIS_URL', 'redis://localhost:6379'),
     decode_responses=True,
-    ssl=True,  # Habilitar TLS para rediss://
     socket_timeout=5,
-    socket_connect_timeout=5
+    socket_connect_timeout=5,
+    ssl_cert_reqs='required'  # Exige certificado TLS para rediss://
 )
+
+# Configuração do Supabase
+supabase = create_client(os.getenv('SUPABASE_URL'), os.getenv('SUPABASE_ANON_KEY'))
 
 # Configuração do Redis
 redis_client = redis.Redis.from_url(
-    os.getenv('REDIS_URL'),  # Não usa fallback para localhost
+    os.getenv('REDIS_URL', 'redis://localhost:6379'),
     decode_responses=True,
-    ssl=True,  # Habilitar TLS para rediss://
     socket_timeout=5,
-    socket_connect_timeout=5
+    socket_connect_timeout=5,
+    ssl_cert_reqs='required'  # Exige certificado TLS para rediss://
 )
 
 # Testar conexão ao Redis na inicialização
