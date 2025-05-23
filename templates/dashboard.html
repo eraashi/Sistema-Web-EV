@@ -48,7 +48,7 @@
         {% if user.cargo in ['admin', 'secretaria'] %}
             Turmas Ativas
         {% else %}
-            Turmas Ativas no Polo
+            Turmas Ativas no {{ user.polos.nome }}
         {% endif %}
     </h3>
     <div class="grid grid-cols-1 md:grid-cols-2 gap-6 max-h-64 overflow-y-auto">

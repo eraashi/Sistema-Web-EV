@@ -242,6 +242,25 @@ button {
     border-radius: 9999px;
 }
 
+/* Estilização para a página de login */
+.bg-login {
+    background-image: url('/static/src/bg_new.png');
+    background-size: cover;
+    background-position: center;
+    background-attachment: fixed;
+    background-repeat: no-repeat;
+}
+
+/* Ajustes para a página de login */
+.bg-login .bg-white {
+    position: relative;
+    z-index: 1;
+}
+
+.bg-login .fixed {
+    z-index: 10;
+}
+
 /* Estilização para a página de estatísticas (reports.html) */
 
 /* Estilizar a seção de Turmas Ativas */
@@ -592,6 +611,137 @@ hr.separator {
     background: #2563eb;
 }
 
+/* Garantir que o contêiner principal tenha altura definida */
+.flex.space-x-6.h-\[calc\(100vh-120px\)\] {
+    height: calc(100vh - 120px);
+    display: flex;
+    flex-direction: row;
+    gap: 24px;
+    overflow: hidden; /* Evitar transbordo do contêiner principal */
+}
+
+/* Estilizar a Primeira Div e a Lista de Funcionários */
+.funcionarios-search-container {
+    display: flex;
+    flex-direction: column;
+    height: 100%;
+    overflow: hidden;
+}
+
+.funcionarios-search-container .space-y-4 {
+    flex-grow: 1;
+    display: flex;
+    flex-direction: column;
+    overflow: hidden; /* Garantir que o contêiner interno não transborde */
+}
+
+#funcionarios-list {
+    flex-grow: 1;
+    max-height: 100%; /* Garantir que a lista não exceda o espaço disponível */
+    overflow-y: auto;
+    scrollbar-width: thin;
+    scrollbar-color: #93c5fd #e5e7eb;
+}
+
+#funcionarios-list::-webkit-scrollbar {
+    width: 8px;
+}
+
+#funcionarios-list::-webkit-scrollbar-track {
+    background: #e5e7eb;
+    border-radius: 4px;
+}
+
+#funcionarios-list::-webkit-scrollbar-thumb {
+    background: #93c5fd;
+    border-radius: 4px;
+}
+
+#funcionarios-list::-webkit-scrollbar-thumb:hover {
+    background: #2563eb;
+}
+
+/* Estilizar a Segunda Div e a Lista de Logs */
+#funcionario-details {
+    display: flex;
+    flex-direction: column;
+    height: 100%;
+    overflow: hidden;
+}
+
+#funcionario-details-content {
+    flex-shrink: 0;
+}
+
+/* Ajustar os botões para ficarem mais encaixados */
+#funcionario-actions {
+    display: flex;
+    justify-content: center;
+    gap: 8px;
+    position: relative; /* Para posicionar o botão de deseleção corretamente */
+    flex-shrink: 0;
+    order: 1;
+}
+
+#funcionario-logs {
+    flex-grow: 1;
+    display: flex;
+    flex-direction: column;
+    overflow: hidden;
+    order: 2;
+}
+
+#logs-list {
+    flex-grow: 1;
+    overflow-y: auto;
+    scrollbar-width: thin;
+    scrollbar-color: #93c5fd #e5e7eb;
+}
+
+#logs-list::-webkit-scrollbar {
+    width: 8px;
+}
+
+#logs-list::-webkit-scrollbar-track {
+    background: #e5e7eb;
+    border-radius: 4px;
+}
+
+#logs-list::-webkit-scrollbar-thumb {
+    background: #93c5fd;
+    border-radius: 4px;
+}
+
+#logs-list::-webkit-scrollbar-thumb:hover {
+    background: #2563eb;
+}
+
+/* Estilizar o ícone de acessibilidade (PCD) para aparecer ao final da última linha */
+#available-students .font-medium,
+#enrolled-students .font-medium {
+    position: relative;
+    display: inline-flex;
+    align-items: center;
+    white-space: normal; /* Permite quebra de linha no texto */
+    padding-right: 24px; /* Espaço para o ícone no final */
+}
+
+.pcd-icon {
+    position: absolute;
+    right: 0; /* Posição padrão (sem quebra de linha) */
+    height: 16px !important;
+    width: 16px !important;
+    color: #3b82f6 !important; /* Cor azul para o ícone */
+    vertical-align: middle;
+    margin-left: 0; /* Removemos o margin-left, pois usaremos right para posicionar */
+}
+
+/* Ajustar a posição do ícone quando há quebra de linha */
+#available-students .font-medium.has-line-break .pcd-icon,
+#enrolled-students .font-medium.has-line-break .pcd-icon {
+    right: 4px; /* Move o ícone para a esquerda (aproximando do texto) */
+}
+
 /* Ajustes para páginas específicas */
 
 /* Dashboard (dashboard.html) */
@@ -757,6 +907,28 @@ main .bg-white.rounded-lg.shadow-md.overflow-hidden {
     }
 
     main .flex.justify-center.mb-6 {
+        padding: 1rem;
+    }
+
+    /* Ajustes para login em telas pequenas */
+    .bg-login {
+        background-image: none;
+        background-color: #ffffff;
+    }
+
+    .bg-login > .flex > .bg-white {
+        width: 100%;
+        height: 100vh;
+        padding: 1rem;
+    }
+
+    .bg-login .max-w-xs {
+        margin-left: auto;
+        margin-right: auto;
+    }
+
+    .bg-login .fixed {
+        width: 100%;
         padding: 1rem;
     }
 }

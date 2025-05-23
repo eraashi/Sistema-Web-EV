@@ -395,6 +395,38 @@ function arraysEqual(arr1, arr2) {
     return sortedArr1.every((value, index) => value === sortedArr2[index]);
 }
 
+// Função para verificar se o texto quebrou em várias linhas e aplicar a classe
+function checkLineBreaks(containerId) {
+    const container = document.getElementById(containerId);
+    if (!container) {
+        console.warn(`Contêiner ${containerId} não encontrado`);
+        return;
+    }
+
+    const nameElements = container.querySelectorAll('.font-medium');
+    console.log(`Verificando quebras de linha em ${containerId}, encontrados ${nameElements.length} elementos com .font-medium`);
+
+    nameElements.forEach((element, index) => {
+        // Obter a altura total do elemento
+        const elementHeight = element.offsetHeight;
+        // Obter a altura de uma linha (usando line-height)
+        const lineHeight = parseFloat(window.getComputedStyle(element).lineHeight);
+        // Obter a largura do elemento
+        const elementWidth = element.offsetWidth;
+        // Verificar se há ícone presente
+        const hasIcon = element.querySelector('.pcd-icon') !== null;
+
+        // Se a altura do elemento for maior que a altura de uma linha, o texto quebrou
+        if (elementHeight > lineHeight) {
+            element.classList.add('has-line-break');
+            console.log(`Quebra de linha detectada para elemento ${index} (${containerId}): Nome: "${element.textContent.trim()}", altura: ${elementHeight}px, line-height: ${lineHeight}px, largura: ${elementWidth}px, tem ícone: ${hasIcon}`);
+        } else {
+            element.classList.remove('has-line-break');
+            console.log(`Sem quebra de linha para elemento ${index} (${containerId}): Nome: "${element.textContent.trim()}", altura: ${elementHeight}px, line-height: ${lineHeight}px, largura: ${elementWidth}px, tem ícone: ${hasIcon}`);
+        }
+    });
+}
+
 function filterClasses(type) {
     currentFilterType = type || currentFilterType; // Novo: atualizar o filtro atual
 
@@ -599,20 +631,35 @@ function filterAvailableStudents() {
     if (div) {
         div.innerHTML = availableStudents.length === 0 ?
             '<div class="text-center py-4 text-gray-500">Nenhuma turma selecionada.</div>' :
-            availableStudents.map(student => `
-                <div class="flex items-center justify-between p-3 border rounded-md hover:bg-gray-50">
-                    <div>
-                        <p class="font-medium">${student.name}</p>
-                        <p class="text-sm text-gray-500">Unidade: ${student.unidade || 'Não especificado'}</p>
-                        <p class="text-sm text-gray-500">${student.etapa}</p>
+            availableStudents.map(student => {
+                // Normalizar o valor de student.pcd para comparação
+                const pcdValue = student.pcd ? student.pcd.trim().toLowerCase() : '';
+                const isPcd = pcdValue === 'com deficiência';
+                console.log(`Aluno disponível: ${student.name}, pcd: ${student.pcd}, normalizado: ${pcdValue}, é PCD: ${isPcd}`);
+                return `
+                    <div class="flex items-center justify-between p-3 border rounded-md hover:bg-gray-50">
+                        <div>
+                            <p class="font-medium inline-flex items-center">
+                                ${student.name}
+                                ${isPcd ? '<i data-lucide="accessibility" class="h-4 w-4 ml-2 text-blue-500 pcd-icon"></i>' : ''}
+                            </p>
+                            <p class="text-sm text-gray-500">Unidade: ${student.unidade || 'Não especificado'}</p>
+                            <p class="text-sm text-gray-500">${student.etapa}</p>
+                        </div>
+                        <button onclick="enrollStudent('${student.id}', this)" class="bg-blue-600 text-white px-3 py-1 rounded-md flex items-center">
+                            <i data-lucide="plus" class="h-4 w-4 mr-1"></i>
+                            Matricular
+                        </button>
                     </div>
-                    <button onclick="enrollStudent('${student.id}', this)" class="bg-blue-600 text-white px-3 py-1 rounded-md flex items-center">
-                        <i data-lucide="plus" class="h-4 w-4 mr-1"></i>
-                        Matricular
-                    </button>
-                </div>
-            `).join('');
-        lucide.createIcons();
+                `;
+            }).join('');
+        // Forçar a renderização dos ícones com um pequeno atraso para garantir que o DOM esteja pronto
+        setTimeout(() => {
+            lucide.createIcons();
+            console.log('Ícones renderizados em filterAvailableStudents');
+            // Verificar quebras de linha após a renderização
+            checkLineBreaks('available-students');
+        }, 100);
     }
 }
 
@@ -636,22 +683,38 @@ function renderEnrolledStudents() {
 
     div.innerHTML = enrolledStudents.length === 0 ?
         '<div class="text-center py-4 text-gray-500">Nenhum aluno matriculado nesta turma.</div>' :
-        enrolledStudents.map(student => `
-            <div class="flex items-center justify-between p-3 border rounded-md hover:bg-gray-50">
-                <div>
-                    <p class="font-medium">${student.name}</p>
-                    <p class="text-sm text-gray-500">Unidade: ${student.unidade || 'Não especificado'}</p>
-                    <p class="text-sm text-gray-500">${student.etapa}</p>
+        enrolledStudents.map(student => {
+            // Normalizar o valor de student.pcd para comparação
+            const pcdValue = student.pcd ? student.pcd.trim().toLowerCase() : '';
+            const isPcd = pcdValue === 'com deficiência';
+            console.log(`Aluno matriculado: ${student.name}, pcd: ${student.pcd}, normalizado: ${pcdValue}, é PCD: ${isPcd}`);
+            return `
+                <div class="flex items-center justify-between p-3 border rounded-md hover:bg-gray-50">
+                    <div>
+                        <p class="font-medium inline-flex items-center">
+                            ${student.name}
+                            ${isPcd ? '<i data-lucide="accessibility" class="h-4 w-4 ml-2 text-blue-500 pcd-icon"></i>' : ''}
+                        </p>
+                        <p class="text-sm text-gray-500">Unidade: ${student.unidade || 'Não especificado'}</p>
+                        <p class="text-sm text-gray-500">${student.etapa}</p>
+                    </div>
+                    <button onclick="unenrollStudent('${student.id}', this)" class="bg-red-600 text-white px-3 py-1 rounded-md flex items-center">
+                        <i data-lucide="trash-2" class="h-4 w-4 mr-1"></i>
+                        Remover
+                    </button>
                 </div>
-                <button onclick="unenrollStudent('${student.id}', this)" class="bg-red-600 text-white px-3 py-1 rounded-md flex items-center">
-                    <i data-lucide="trash-2" class="h-4 w-4 mr-1"></i>
-                    Remover
-                </button>
-            </div>
-        `).join('');
+            `;
+        }).join('');
+
+    // Forçar a renderização dos ícones com um pequeno atraso para garantir que o DOM esteja pronto
+    setTimeout(() => {
+        lucide.createIcons();
+        console.log('Ícones renderizados em renderEnrolledStudents');
+        // Verificar quebras de linha após a renderização
+        checkLineBreaks('enrolled-students');
+    }, 100);
 
     updateSelectedClassDetails();
-    lucide.createIcons();
 }
 
 async function enrollStudent(studentId, button) {

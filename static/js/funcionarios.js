@@ -155,6 +155,15 @@
         });
     }
 
+    function toggleUnidadeField(cargoSelectId, unidadeFieldClass) {
+        const cargoSelect = document.getElementById(cargoSelectId);
+        const unidadeField = document.querySelector(`.${unidadeFieldClass}`);
+        if (!cargoSelect || !unidadeField) return;
+
+        const cargo = cargoSelect.value.toLowerCase();
+        unidadeField.style.display = (cargo === 'diretor' || cargo === 'monitor') ? 'flex' : 'none';
+    }
+
     async function searchFuncionarios() {
         if (isFetching) return;
         isFetching = true;
@@ -240,16 +249,22 @@
         const detailsDiv = document.getElementById('funcionario-details-content');
         const actionsDiv = document.getElementById('funcionario-actions');
         const logsList = document.getElementById('logs-list');
+        const deselectBtn = document.getElementById('deselect-btn');
 
         if (!currentFuncionario) {
             detailsDiv.innerHTML = '<p class="text-gray-500">Selecione um funcionário para visualizar os detalhes.</p>';
             actionsDiv.innerHTML = '';
             logsList.innerHTML = '';
+            if (deselectBtn) deselectBtn.classList.add('hidden');
             lucide.createIcons();
             return;
         }
 
+        if (deselectBtn) deselectBtn.classList.remove('hidden');
+
         if (isEditing) {
+            const cargo = currentFuncionario.cargo.toLowerCase();
+            const showUnidade = cargo === 'diretor' || cargo === 'monitor';
             updateUnidadesSelect(currentFuncionario.polo_nome, 'edit-unidade');
             detailsDiv.innerHTML = `
                 <div class="space-y-4">
@@ -276,7 +291,7 @@
                                 ${polos.map(polo => `<option value="${polo.nome}" ${currentFuncionario.polo_nome === polo.nome ? 'selected' : ''}>${polo.nome}</option>`).join('')}
                             </select>
                         </div>
-                        <div>
+                        <div class="unidade-field" style="display: ${showUnidade ? 'block' : 'none'};">
                             <p class="text-sm font-medium text-gray-500">Unidade</p>
                             <select id="edit-unidade" class="w-full p-2 border border-gray-300 rounded-md shadow-sm focus:outline-none focus:ring-blue-500 focus:border-blue-500">
                                 <!-- Opções preenchidas dinamicamente -->
@@ -290,11 +305,20 @@
                 </div>
             `;
             actionsDiv.innerHTML = `
-                <button id="cancel-btn" class="bg-gray-500 text-white px-4 py-2 rounded-md hover:bg-gray-600">Cancelar</button>
-                <button id="save-btn" class="bg-blue-500 text-white px-4 py-2 rounded-md hover:bg-blue-600">Salvar</button>
+                <div class="flex justify-center space-x-2">
+                    <button id="cancel-btn" class="bg-gray-500 text-white px-4 py-2 rounded-md hover:bg-gray-600">Cancelar</button>
+                    <button id="save-btn" class="bg-blue-500 text-white px-4 py-2 rounded-md hover:bg-blue-600">Salvar</button>
+                </div>
             `;
             document.getElementById('cancel-btn').addEventListener('click', cancelEdit);
             document.getElementById('save-btn').addEventListener('click', saveEdit);
+
+            // Adicionar evento para atualizar visibilidade do campo de unidade
+            const editCargoSelect = document.getElementById('edit-cargo');
+            if (editCargoSelect) {
+                editCargoSelect.addEventListener('change', () => toggleUnidadeField('edit-cargo', 'unidade-field'));
+            }
+
             logsList.innerHTML = '';
         } else {
             detailsDiv.innerHTML = `
@@ -328,16 +352,12 @@
                 </div>
             `;
             actionsDiv.innerHTML = `
-                <button id="deselect-btn" class="absolute top-4 right-4 text-gray-500 hover:text-gray-700">
-                    <svg class="h-6 w-6" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12"/>
-                    </svg>
-                </button>
-                <button id="edit-btn" class="bg-blue-500 text-white px-4 py-2 rounded-md hover:bg-blue-600">Editar</button>
-                <button id="delete-btn" class="delete-button">Excluir</button>
+                <div class="flex justify-center space-x-2">
+                    <button id="edit-btn" class="bg-blue-500 text-white px-4 py-2 rounded-md hover:bg-blue-600">Editar</button>
+                    <button id="delete-btn" class="delete-button">Excluir</button>
+                </div>
             `;
             document.getElementById('edit-btn').addEventListener('click', startEdit);
-            document.getElementById('deselect-btn').addEventListener('click', deselectFuncionario);
             document.getElementById('delete-btn').addEventListener('click', () => deleteFuncionario(currentFuncionario.id, currentFuncionario.nome));
 
             logsList.innerHTML = currentFuncionario.logs && currentFuncionario.logs.length > 0
@@ -373,7 +393,7 @@
             cpf: document.getElementById('edit-cpf').value,
             cargo: document.getElementById('edit-cargo').value,
             polo_name: document.getElementById('edit-polo').value,
-            unidade: document.getElementById('edit-unidade').value || null
+            unidade: document.getElementById('edit-unidade')?.value || null
         };
 
         try {
@@ -411,8 +431,15 @@
         modal.style.display = 'block';
         document.getElementById('create-funcionario-form').reset();
         document.querySelectorAll('.tooltip').forEach(tooltip => tooltip.style.display = 'none');
+        document.querySelector('.unidade-field').style.display = 'none'; // Inicialmente ocultar unidade
         updateUnidadesSelect('', 'create-unidade');
         lucide.createIcons();
+
+        // Adicionar evento para atualizar visibilidade do campo de unidade
+        const createCargoSelect = document.getElementById('create-cargo');
+        if (createCargoSelect) {
+            createCargoSelect.addEventListener('change', () => toggleUnidadeField('create-cargo', 'unidade-field'));
+        }
     }
 
     function closeCreateModal() {
@@ -547,6 +574,11 @@
                 const selectedPolo = editPoloSelect.value;
                 updateUnidadesSelect(selectedPolo, 'edit-unidade');
             });
+        }
+
+        const deselectBtn = document.getElementById('deselect-btn');
+        if (deselectBtn) {
+            deselectBtn.addEventListener('click', deselectFuncionario);
         }
 
         await searchFuncionarios();

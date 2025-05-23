@@ -1,0 +1,349 @@
+{% extends 'base.html' %}
+
+{% block title %}Gerenciamento de Salas{% endblock %}
+
+{% block header %}Gerenciamento de Salas{% endblock %}
+
+{% block content %}
+<div class="mb-6 px-6 py-4">
+    <div class="flex justify-between items-center mb-4">
+        <h2 class="text-lg font-semibold">Lista de Salas</h2>
+        {% if user.cargo in ['admin', 'secretaria'] %}
+        <button id="create-room-button" class="bg-blue-600 text-white px-4 py-2 rounded-md hover:bg-blue-700 flex items-center">
+            <i data-lucide="plus" class="h-4 w-4 mr-2"></i>
+            Nova Sala
+        </button>
+        {% endif %}
+    </div>
+    <div class="space-y-4">
+        <div class="relative">
+            <input
+                id="room-search"
+                type="text"
+                placeholder="Buscar salas..."
+                class="w-full p-2 pl-10 border border-gray-300 rounded-md shadow-sm focus:outline-none focus:ring-blue-500 focus:border-blue-500"
+            >
+            <i data-lucide="search" class="absolute left-3 top-1/2 -translate-y-1/2 h-5 w-5 text-gray-400"></i>
+        </div>
+        {% if user.cargo in ['admin', 'secretaria'] %}
+        <select id="polo-filter" class="w-full p-2 border border-gray-300 rounded-md shadow-sm focus:outline-none focus:ring-blue-500 focus:border-blue-500">
+            <option value="">Todos os Polos</option>
+        </select>
+        {% endif %}
+    </div>
+</div>
+<div class="bg-white rounded-lg shadow-md overflow-hidden">
+    <div id="loading-overlay" class="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50" style="display: none;">
+        <div class="w-12 h-12 border-4 border-blue-600 border-t-transparent rounded-full animate-spin"></div>
+    </div>
+    <div class="pagination-top py-4 px-6"></div>
+    <table class="min-w-full divide-y divide-gray-200">
+        <thead class="bg-gray-50">
+            <tr>
+                <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">Nome</th>
+                <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">Polo</th>
+                <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">Capacidade</th>
+                <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">Turmas Vinculadas</th>
+                {% if user.cargo in ['admin', 'secretaria'] %}
+                <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">Ações</th>
+                {% endif %}
+            </tr>
+        </thead>
+        <tbody id="room-table-body" class="divide-y divide-gray-200">
+            <tr>
+                <td colspan="{% if user.cargo in ['admin', 'secretaria'] %}5{% else %}4{% endif %}" class="px-6 py-4 text-center text-gray-500">
+                    Carregando salas...
+                </td>
+            </tr>
+        </tbody>
+    </table>
+    <div class="pagination py-4 px-6"></div>
+</div>
+
+<!-- Container para Toasts -->
+<div id="custom-toast-container"></div>
+
+<!-- Modal para criar sala -->
+<div id="create-room-modal" class="modal" style="display: none;">
+    <div class="modal-content">
+        <h2 class="modal-title">Criar Nova Sala</h2>
+        <form id="create-room-form" class="space-y-4">
+            <div class="relative">
+                <label for="create-nome" class="block text-sm font-medium text-gray-700">Nome</label>
+                <input
+                    id="create-nome"
+                    name="nome"
+                    type="text"
+                    required
+                    class="w-full p-2 border border-gray-300 rounded-md shadow-sm focus:outline-none focus:ring-blue-500 focus:border-blue-500"
+                >
+                <div class="tooltip" id="tooltip-create-nome"></div>
+            </div>
+            <div class="relative">
+                <label for="create-capacidade" class="block text-sm font-medium text-gray-700">Capacidade</label>
+                <input
+                    id="create-capacidade"
+                    name="capacidade"
+                    type="number"
+                    min="1"
+                    required
+                    class="w-full p-2 border border-gray-300 rounded-md shadow-sm focus:outline-none focus:ring-blue-500 focus:border-blue-500"
+                >
+                <div class="tooltip" id="tooltip-create-capacidade"></div>
+            </div>
+            {% if user.cargo in ['admin', 'secretaria'] %}
+            <div class="relative">
+                <label for="create-polo-select" class="block text-sm font-medium text-gray-700">Polo</label>
+                <select
+                    id="create-polo-select"
+                    name="polo_name"
+                    class="w-full p-2 border border-gray-300 rounded-md shadow-sm focus:outline-none focus:ring-blue-500 focus:border-blue-500"
+                >
+                    <option value="" disabled selected>Escolha um polo...</option>
+                </select>
+                <div class="tooltip" id="tooltip-create-polo-select"></div>
+            </div>
+            {% else %}
+            <div>
+                <label for="create-polo-name" class="block text-sm font-medium text-gray-700">Polo</label>
+                <input
+                    id="create-polo-name"
+                    name="polo_name"
+                    type="text"
+                    value="{{ user.polos.nome if user and user.polos and user.polos.nome else '' }}"
+                    readonly
+                    class="w-full p-2 border border-gray-300 rounded-md bg-gray-100 cursor-not-allowed"
+                >
+            </div>
+            {% endif %}
+            <div class="flex justify-end space-x-2">
+                <button type="button" id="cancel-create-room" class="bg-gray-300 text-gray-700 px-4 py-2 rounded-md hover:bg-gray-400">Cancelar</button>
+                <button type="submit" class="bg-blue-600 text-white px-4 py-2 rounded-md hover:bg-blue-700 flex items-center">
+                    <i data-lucide="save" class="h-4 w-4 mr-2"></i>
+                    Criar
+                </button>
+            </div>
+        </form>
+    </div>
+</div>
+
+<!-- Modal para editar sala -->
+<div id="edit-room-modal" class="modal" style="display: none;">
+    <div class="modal-content">
+        <h2 class="modal-title">Editar Sala</h2>
+        <form id="edit-room-form" class="space-y-4">
+            <input type="hidden" id="edit-room-id" name="room_id">
+            <div class="relative">
+                <label for="edit-nome" class="block text-sm font-medium text-gray-700">Nome</label>
+                <input
+                    id="edit-nome"
+                    name="nome"
+                    type="text"
+                    required
+                    class="w-full p-2 border border-gray-300 rounded-md shadow-sm focus:outline-none focus:ring-blue-500 focus:border-blue-500"
+                >
+                <div class="tooltip" id="tooltip-edit-nome"></div>
+            </div>
+            <div class="relative">
+                <label for="edit-capacidade" class="block text-sm font-medium text-gray-700">Capacidade</label>
+                <input
+                    id="edit-capacidade"
+                    name="capacidade"
+                    type="number"
+                    min="1"
+                    required
+                    class="w-full p-2 border border-gray-300 rounded-md shadow-sm focus:outline-none focus:ring-blue-500 focus:border-blue-500"
+                >
+                <div class="tooltip" id="tooltip-edit-capacidade"></div>
+            </div>
+            {% if user.cargo in ['admin', 'secretaria'] %}
+            <div class="relative">
+                <label for="edit-polo-select" class="block text-sm font-medium text-gray-700">Polo</label>
+                <select
+                    id="edit-polo-select"
+                    name="polo_name"
+                    class="w-full p-2 border border-gray-300 rounded-md shadow-sm focus:outline-none focus:ring-blue-500 focus:border-blue-500"
+                >
+                    <option value="" disabled>Escolha um polo...</option>
+                </select>
+                <div class="tooltip" id="tooltip-edit-polo-select"></div>
+            </div>
+            {% else %}
+            <div>
+                <label for="edit-polo-name" class="block text-sm font-medium text-gray-700">Polo</label>
+                <input
+                    id="edit-polo-name"
+                    name="polo_name"
+                    type="text"
+                    readonly
+                    class="w-full p-2 border border-gray-300 rounded-md bg-gray-100 cursor-not-allowed"
+                >
+            </div>
+            {% endif %}
+            <div class="flex justify-end space-x-2">
+                <button type="button" id="cancel-edit-room" class="bg-gray-300 text-gray-700 px-4 py-2 rounded-md hover:bg-gray-400">Cancelar</button>
+                <button type="submit" class="bg-blue-600 text-white px-4 py-2 rounded-md hover:bg-blue-700 flex items-center">
+                    <i data-lucide="save" class="h-4 w-4 mr-2"></i>
+                    Salvar
+                </button>
+            </div>
+        </form>
+    </div>
+</div>
+
+<!-- Modal para visualizar turmas -->
+<div id="view-classes-modal" class="modal" style="display: none;">
+    <div class="modal-content">
+        <h2 class="modal-title">Turmas Vinculadas à Sala</h2>
+        <div id="classes-list" class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4"></div>
+        <div class="modal-footer">
+            <button type="button" id="close-classes-modal" class="modal-button modal-button-cancel">Fechar</button>
+        </div>
+    </div>
+</div>
+
+<style>
+/* Estilo do Modal */
+.modal {
+    position: fixed;
+    z-index: 1000;
+    left: 0;
+    top: 0;
+    width: 100%;
+    height: 100%;
+    overflow: auto;
+    background-color: rgba(0, 0, 0, 0.5);
+}
+
+.modal-content {
+    background-color: #fff;
+    margin: auto;
+    padding: 20px;
+    border: 1px solid #888;
+    width: 80%;
+    max-width: 800px;
+    border-radius: 8px;
+    position: relative;
+    top: 50%;
+    transform: translateY(-50%);
+}
+
+.modal-title {
+    font-size: 1.25rem;
+    font-weight: 600;
+    margin-bottom: 20px;
+}
+
+.modal-footer {
+    margin-top: 24px;
+    display: flex;
+    justify-content: flex-end;
+    gap: 8px;
+}
+
+.modal-button {
+    padding: 8px 16px;
+    border-radius: 4px;
+    font-size: 1rem;
+    cursor: pointer;
+}
+
+.modal-button-cancel {
+    background-color: #d1d5db;
+    color: #374151;
+}
+
+.modal-button-cancel:hover {
+    background-color: #9ca3af;
+}
+
+/* Estilo do Card de Turma */
+.class-card {
+    background-color: #f9fafb;
+    border: 1px solid #e5e7eb;
+    border-radius: 8px;
+    padding: 16px;
+    box-shadow: 0 1px 3px rgba(0, 0, 0, 0.1);
+}
+
+.class-card h3 {
+    font-size: 1rem;
+    font-weight: 600;
+    margin-bottom: 8px;
+}
+
+.class-card p {
+    font-size: 0.875rem;
+    color: #4b5563;
+    margin-bottom: 4px;
+}
+
+.class-type-tag {
+    display: inline-block;
+    padding: 2px 8px;
+    border-radius: 12px;
+    font-size: 12px;
+    font-weight: 500;
+    margin-left: 8px;
+    color: white;
+}
+
+.class-type-tag.cognitiva {
+    background-color: #86efac;
+}
+
+.class-type-tag.motora {
+    background-color: #d8b4fe;
+}
+
+/* Estilo do Botão Editar */
+.edit-button {
+    background-color: #f59e0b;
+    color: #fff;
+    padding: 4px 8px;
+    border-radius: 4px;
+    display: inline-flex;
+    align-items: center;
+    gap: 4px;
+    font-size: 14px;
+    border: none;
+    cursor: pointer;
+}
+
+.edit-button:hover {
+    background-color: #d97706;
+}
+
+.edit-button i {
+    width: 16px;
+    height: 16px;
+}
+
+/* Estilo do Botão Excluir */
+.delete-button {
+    background-color: #ef4444;
+    color: #fff;
+    padding: 4px 8px;
+    border-radius: 4px;
+    display: inline-flex;
+    align-items: center;
+    gap: 4px;
+    font-size: 14px;
+    border: none;
+    cursor: pointer;
+}
+
+.delete-button:hover {
+    background-color: #dc2626;
+}
+
+.delete-button i {
+    width: 16px;
+    height: 16px;
+}
+</style>
+{% endblock %}
+
+{% block scripts %}
+<script src="/static/js/salas.js"></script>
+{% endblock %}

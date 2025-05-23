@@ -32,6 +32,24 @@ const retryFetch = async (url, options, retries = 2, delay = 500) => {
         }
     }
 
+    // Verificar espaço no localStorage antes de salvar
+    const checkStorageSpace = () => {
+        try {
+            let totalSize = 0;
+            for (let x in localStorage) {
+                if (localStorage.hasOwnProperty(x)) {
+                    totalSize += ((localStorage[x].length + x.length) * 2);
+                }
+            }
+            // Estimar espaço disponível (assumindo limite de 5MB)
+            const maxSize = 5 * 1024 * 1024; // 5MB em bytes
+            return totalSize < maxSize * 0.9; // Permitir até 90% do limite
+        } catch (e) {
+            console.warn('Erro ao verificar espaço no localStorage:', e.message);
+            return false;
+        }
+    };
+
     for (let i = 0; i < retries; i++) {
         try {
             const response = await fetch(url, options);
@@ -39,16 +57,33 @@ const retryFetch = async (url, options, retries = 2, delay = 500) => {
                 throw new Error(`Erro HTTP! Status: ${response.status}`);
             }
             const data = await response.json();
-            try {
-                localStorage.setItem(cacheKey, JSON.stringify({ data, timestamp: Date.now() }));
-                console.log('Dados armazenados no cache local:', { 
-                    url, 
-                    data_length: data?.data?.length || 0, 
-                    total_pages: data?.total_pages || 0, 
-                    total_alunos: data?.total_alunos || 0 
-                });
-            } catch (e) {
-                console.warn('Erro ao salvar no localStorage:', e.message);
+            if (checkStorageSpace()) {
+                try {
+                    localStorage.setItem(cacheKey, JSON.stringify({ data, timestamp: Date.now() }));
+                    console.log('Dados armazenados no cache local:', { 
+                        url, 
+                        data_length: data?.data?.length || 0, 
+                        total_pages: data?.total_pages || 0, 
+                        total_alunos: data?.total_alunos || 0 
+                    });
+                } catch (e) {
+                    console.warn('Erro ao salvar no localStorage:', e.message);
+                    // Limpar caches antigos para liberar espaço
+                    for (let key in localStorage) {
+                        if (key.startsWith('cache_') && key !== cacheKey) {
+                            localStorage.removeItem(key);
+                        }
+                    }
+                    // Tentar salvar novamente
+                    try {
+                        localStorage.setItem(cacheKey, JSON.stringify({ data, timestamp: Date.now() }));
+                        console.log('Dados armazenados após limpeza do cache:', { url });
+                    } catch (e) {
+                        console.warn('Falha ao salvar mesmo após limpeza:', e.message);
+                    }
+                }
+            } else {
+                console.warn('Espaço insuficiente no localStorage, pulando cache:', { url });
             }
             return data;
         } catch (error) {
@@ -74,6 +109,15 @@ async function fetchStudents(page = 1, filters = {}) {
     if (mainContent) {
         mainContent.classList.add('pointer-events-none');
     }
+
+    // Timeout para forçar remoção do overlay após 10 segundos
+    const overlayTimeout = setTimeout(() => {
+        if (overlay && mainContent) {
+            overlay.remove();
+            mainContent.classList.remove('pointer-events-none');
+            console.warn('Overlay removido por timeout após 10 segundos');
+        }
+    }, 10000);
 
     try {
         students = [];
@@ -111,8 +155,15 @@ async function fetchStudents(page = 1, filters = {}) {
                         totalAlunos
                     });
                     isRendered = true;
+                    // Remover overlay antes de renderizar
+                    clearTimeout(overlayTimeout);
+                    if (overlay && mainContent) {
+                        overlay.remove();
+                        mainContent.classList.remove('pointer-events-none');
+                    }
                     renderStudents();
                     updatePagination();
+                    return;
                 } else {
                     console.warn('Cache local inválido ou incompleto (fetchStudents):', {
                         timestamp_valid: Date.now() - timestamp < 300000,
@@ -139,6 +190,13 @@ async function fetchStudents(page = 1, filters = {}) {
         currentPage = data.current_page || 1;
         totalAlunos = data.total_alunos || 0;
 
+        // Remover overlay antes de renderizar
+        clearTimeout(overlayTimeout);
+        if (overlay && mainContent) {
+            overlay.remove();
+            mainContent.classList.remove('pointer-events-none');
+        }
+
         if (!isRendered || students.length > 0) {
             console.log('Renderizando com dados frescos');
             renderStudents();
@@ -146,26 +204,15 @@ async function fetchStudents(page = 1, filters = {}) {
         } else {
             console.log('Pulando renderização, dados já exibidos via cache');
         }
-
-        // Carregar dados do dashboard para atualizar o cache, se necessário
-        const dashboardCacheKey = 'cache_/api/dashboard_data?apply_unit_filter=true';
-        const dashboardCached = localStorage.getItem(dashboardCacheKey);
-        if (!dashboardCached) {
-            console.log('Atualizando cache do dashboard_data');
-            await retryFetch('/api/dashboard_data?apply_unit_filter=true', { credentials: 'include' });
-        }
-
-        if (overlay && mainContent) {
-            overlay.remove();
-            mainContent.classList.remove('pointer-events-none');
-        }
     } catch (error) {
         showToast('Erro ao carregar alunos: ' + error.message, 'error', 'alert-circle', 3000);
-        renderStudents();
+        // Remover overlay em caso de erro
+        clearTimeout(overlayTimeout);
         if (overlay && mainContent) {
             overlay.remove();
             mainContent.classList.remove('pointer-events-none');
         }
+        renderStudents();
     }
 }
 
@@ -174,7 +221,7 @@ function renderStudents() {
     tbody.innerHTML = '';
 
     if (students.length === 0) {
-        const colspan = currentUserRole === 'admin' || currentUserRole === 'secretaria' || currentUserRole === 'coordenador' ? 10 : 9;
+        const colspan = currentUserRole === 'admin' || currentUserRole === 'secretaria' || currentUserRole === 'coordenador' ? 11 : 10;
         tbody.innerHTML = `<tr><td colspan="${colspan}" class="px-6 py-4 text-center text-gray-500">Nenhum aluno encontrado com os filtros selecionados.</td></tr>`;
     } else {
         students.forEach(student => {
@@ -201,11 +248,7 @@ function renderStudents() {
                     statusText = 'Desconhecido';
             }
             const pcdDisplay = student.pcd === 'Com Deficiência' ? 'Sim' : student.pcd === 'Sem Deficiência' ? 'Não' : 'Não especificado';
-            const poloDisplay = student.polo_name
-                .replace('POLO I (Bacaxá)', 'POLO Bacaxá')
-                .replace('POLO II (Sampaio Correia)', 'POLO Sampaio Correia')
-                .replace('Polo III (Jaconé)', 'POLO Jaconé')
-                .replace('Polo IV (Saquarema)', 'POLO Saquarema');
+            const poloDisplay = student.polo_name || 'Não especificado';
             // Botão para visualizar turmas, aparece apenas se o aluno tiver matrículas
             const hasEnrollments = student.enrollments && student.enrollments.length > 0;
             const classesButton = hasEnrollments
@@ -282,11 +325,7 @@ function openEditModal(student) {
 
     document.getElementById('edit-student-id').value = student.id || '';
     document.getElementById('edit-name').value = student.name || '';
-    document.getElementById('edit-polo-name').value = student.polo_name
-        .replace('POLO I (Bacaxá)', 'POLO Bacaxá')
-        .replace('POLO II (Sampaio Correia)', 'POLO Sampaio Correia')
-        .replace('Polo III (Jaconé)', 'POLO Jaconé')
-        .replace('Polo IV (Saquarema)', 'POLO Saquarema') || 'POLO Bacaxá';
+    document.getElementById('edit-polo-name').value = student.polo_name || 'POLO Bacaxá';
 
     const unidadeSelect = document.getElementById('edit-unidade');
     if (student.unidade && unidadeSelect.querySelector(`option[value="${student.unidade}"]`)) {

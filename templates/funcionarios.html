@@ -7,9 +7,9 @@
 {% block content %}
 <div class="flex space-x-6 h-[calc(100vh-120px)]">
     <!-- Primeira Div: Busca de Funcionários -->
-    <div class="border border-blue-400 rounded-lg p-6 bg-white" style="flex: 1; min-width: 0;">
+    <div class="border border-blue-400 rounded-lg p-6 bg-white flex flex-col funcionarios-search-container" style="flex: 1; min-width: 0; height: 100%;">
         <h2 class="text-lg font-semibold mb-4">Buscar Funcionários</h2>
-        <div class="space-y-4">
+        <div class="space-y-4 flex flex-col flex-grow">
             <!-- Filtro: Nome -->
             <div>
                 <label for="nome" class="block text-sm font-medium text-gray-700">Nome</label>
@@ -39,28 +39,33 @@
                 </select>
             </div>
             <!-- Lista de Funcionários -->
-            <div id="funcionarios-list" class="mt-4 max-h-[calc(100%-220px)] overflow-y-auto">
+            <div id="funcionarios-list" class="mt-4 overflow-y-auto flex-grow">
                 <!-- Resultados serão preenchidos dinamicamente via JavaScript -->
             </div>
         </div>
     </div>
 
     <!-- Segunda Div: Detalhes do Funcionário -->
-    <div id="funcionario-details" class="border border-blue-400 rounded-lg p-6 bg-white relative" style="flex: 1; min-width: 0;">
-        <h2 class="text-lg font-semibold mb-4">Detalhes do Funcionário</h2>
-        <div id="funcionario-details-content">
+    <div id="funcionario-details" class="border border-blue-400 rounded-lg p-6 bg-white flex flex-col" style="flex: 1; min-width: 0; height: 100%;">
+        <div class="flex justify-between items-center mb-4">
+            <h2 class="text-lg font-semibold">Detalhes do Funcionário</h2>
+            <button id="deselect-btn" class="text-gray-500 hover:text-gray-700 hidden">
+                <i data-lucide="x" class="h-5 w-5"></i>
+            </button>
+        </div>
+        <div id="funcionario-details-content" class="flex-shrink-0">
             <p class="text-gray-500">Selecione um funcionário para visualizar os detalhes.</p>
         </div>
-        <hr class="border-t border-blue-400 my-4" />
+        <hr class="border-t border-blue-400 my-8" />
+        <div id="funcionario-actions" class="flex justify-center space-x-2 py-8"></div>
+        <hr class="border-t border-blue-400 my-8" />
         <!-- Seção de Logs -->
-        <div id="funcionario-logs" class="mt-4">
+        <div id="funcionario-logs" class="flex-grow mt-8">
             <h3 class="text-md font-semibold mb-2">Log Recente do Funcionário</h3>
-            <div id="logs-list" class="max-h-[200px] overflow-y-auto border border-gray-200 rounded-md p-2">
+            <div id="logs-list" class="overflow-y-auto border border-gray-200 rounded-md p-2 flex-grow max-height-100">
                 <!-- Logs serão preenchidos dinamicamente via JavaScript -->
             </div>
         </div>
-        <hr class="border-t border-blue-400 my-4" />
-        <div id="funcionario-actions" class="mt-4 flex justify-center space-x-2"></div>
     </div>
 
     <!-- Terceira Div: Botão Criar Cadastro -->
@@ -121,7 +126,7 @@
                         <div class="tooltip" id="tooltip-polo"></div>
                     </div>
                 </div>
-                <div class="modal-field-with-icon flex items-center mb-4">
+                <div class="modal-field-with-icon flex items-center mb-4 unidade-field" style="display: none;">
                     <i data-lucide="building" class="h-5 w-5 mr-2 icon-align"></i>
                     <div class="field-container">
                         <label for="create-unidade" class="modal-label">Unidade</label>
@@ -358,6 +363,60 @@
     cursor: pointer !important;
     padding: 0 6px !important;
     flex-shrink: 0 !important;
+}
+
+/* Estilo do contêiner de detalhes do funcionário */
+#funcionario-details {
+    position: relative !important;
+    display: flex !important;
+    flex-direction: column !important;
+    height: 100% !important;
+    overflow: hidden !important;
+}
+
+/* Estilo do contêiner de detalhes */
+#funcionario-details-content {
+    flex-shrink: 0 !important;
+}
+
+/* Estilo do botão de fechar seleção */
+#funcionario-details #deselect-btn.hidden {
+    display: none !important;
+}
+
+/* Estilo do contêiner de ações */
+#funcionario-details #funcionario-actions {
+    display: flex !important;
+    justify-content: center !important;
+    margin: 0 !important;
+    padding: 8px 0 !important;
+    order: 0 !important;
+}
+
+/* Estilo dos botões Editar e Excluir */
+#funcionario-details #funcionario-actions .flex {
+    display: flex !important;
+    justify-content: center !important;
+    gap: 8px !important;
+}
+
+/* Garantir que os divisores azuis sejam consistentes */
+#funcionario-details hr.border-t.border-blue-400 {
+    margin: 8px 0 !important;
+    width: 100% !important;
+}
+
+/* Neutralizar margem superior e order em funcionario-logs */
+#funcionario-details #funcionario-logs {
+    margin-top: 8px !important;
+    flex-grow: 1 !important;
+    order: 0 !important;
+}
+
+/* Ajustar a lista de logs para ocupar todo o espaço */
+#funcionario-details #logs-list {
+    flex-grow: 1 !important;
+    max-height: 100% !important;
 }
 </style>
 

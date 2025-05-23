@@ -121,10 +121,10 @@ def invalidate_turmas_ativas_cache():
     try:
         cursor = 0
         while True:
-            cursor, keys = redis_client.scan(cursor=cursor, match='turmas_ativas:*', count=100)
+            cursor, keys = redis_client.scan(cursor=cursor, match='turmas:*', count=100)
             if keys:
                 redis_client.delete(*keys)
-                print(f"Cache de turmas_ativas limpo: {keys}")
+                print(f"Cache de turmas limpo: {keys}")
             if cursor == 0:
                 break
         cursor = 0
@@ -135,8 +135,38 @@ def invalidate_turmas_ativas_cache():
                 print(f"Cache de dashboard_data limpo: {keys}")
             if cursor == 0:
                 break
+        cursor = 0
+        while True:
+            cursor, keys = redis_client.scan(cursor=cursor, match='turmas_ativas:*', count=100)
+            if keys:
+                redis_client.delete(*keys)
+                print(f"Cache de turmas_ativas limpo: {keys}")
+            if cursor == 0:
+                break
     except Exception as e:
-        print(f"Erro ao invalidar cache de turmas_ativas ou dashboard_data: {str(e)}")
+        print(f"Erro ao invalidar caches: {str(e)}")
+
+def invalidate_salas_cache():
+    try:
+        cursor = 0
+        while True:
+            cursor, keys = redis_client.scan(cursor=cursor, match='salas:*', count=100)
+            if keys:
+                redis_client.delete(*keys)
+                print(f"Cache de salas limpo: {keys}")
+            if cursor == 0:
+                break
+    except Exception as e:
+        print(f"Erro ao invalidar caches de salas: {str(e)}")
+
+@app.route('/salas')
+def salas():
+    user = get_current_user()
+    if not user:
+        print("Nenhum usuário autenticado em /salas, redirecionando para login")
+        return redirect(url_for('login'))
+    print(f"Usuário autenticado em /salas: {user['id']}")
+    return render_template('salas.html', user=user)
 
 @app.route('/')
 def index():
@@ -1123,17 +1153,6 @@ def manage_alunos_paginados():
 
         print(f"Filtro turma_unidade recebido (usando como unidade): {turma_unidade}")
 
-        # Mapear os valores de polo_name para os valores esperados no banco de dados
-        polo_name_mapping = {
-            'POLO Bacaxá': 'POLO I (Bacaxá)',
-            'POLO Sampaio Correia': 'POLO II (Sampaio Correia)',
-            'POLO Jaconé': 'POLO III (Jaconé)',
-            'POLO Saquarema': 'POLO IV (Saquarema)'
-        }
-        if polo_name in polo_name_mapping:
-            polo_name = polo_name_mapping[polo_name]
-            print(f"Mapeado polo_name de {request.args.get('polo_name')} para {polo_name}")
-
         if etapa and etapa.lower() != 'tudo':
             etapa = f"{etapa}º Ano"
 
@@ -1185,7 +1204,7 @@ def manage_alunos_paginados():
         if matricula:
             base_query = base_query.ilike('matricula', f'%{matricula}%')
         if polo_name and polo_name.lower() != 'tudo':
-            polo_query = supabase.table('polos').select('id').ilike('nome', polo_name).execute()
+            polo_query = supabase.table('polos').select('id').eq('nome', polo_name).execute()
             if polo_query.data:
                 polo_id = polo_query.data[0]['id']
                 print(f"Polo encontrado: {polo_name}, ID: {polo_id}")
@@ -1244,7 +1263,7 @@ def manage_alunos_paginados():
                 print(f"Filtro por unidades na query principal (coordenador): {unidades_do_polo}")
 
         if polo_name and polo_name.lower() != 'tudo':
-            polo_query = supabase.table('polos').select('id').ilike('nome', polo_name).execute()
+            polo_query = supabase.table('polos').select('id').eq('nome', polo_name).execute()
             if polo_query.data:
                 polo_id = polo_query.data[0]['id']
                 query = query.eq('polo_id', polo_id)
@@ -1418,19 +1437,23 @@ def get_turmas():
         data = request.json
         print(f"Dados recebidos para criação de turma: {data}")
         try:
-            if 'disciplina_id' not in data or not data['disciplina_id']:
-                print("Erro: disciplina_id não fornecido")
-                return jsonify({'error': 'disciplina_id é obrigatório'}), 400
+            # Validação de campos obrigatórios
+            required_fields = ['name', 'disciplina_id', 'grades', 'day', 'period', 'capacity', 'polo_name']
+            missing_fields = [field for field in required_fields if field not in data or data[field] is None or data[field] == '']
+            if missing_fields:
+                error_msg = f"Campos obrigatórios ausentes: {', '.join(missing_fields)}"
+                print(error_msg)
+                return jsonify({'error': error_msg}), 400
 
             disciplina_id = data['disciplina_id']
             print(f"Disciplina ID recebida: {disciplina_id}")
-
             disciplina = execute_supabase_query(
                 supabase.table('disciplinas').select('id, nome, tipo').eq('id', disciplina_id).single()
             )
             if not disciplina:
-                print(f"Disciplina com ID {disciplina_id} não encontrada")
-                return jsonify({'error': f"Disciplina com ID {disciplina_id} não encontrada"}), 400
+                error_msg = f"Disciplina com ID {disciplina_id} não encontrada"
+                print(error_msg)
+                return jsonify({'error': error_msg}), 400
 
             tipo = disciplina['tipo']
             print(f"Tipo da disciplina: {tipo}")
@@ -1438,10 +1461,35 @@ def get_turmas():
             polo_query = supabase.table('polos').select('id').eq('nome', data['polo_name'])
             polo = execute_supabase_query(polo_query)
             if not polo:
-                print(f"Polo com nome {data['polo_name']} não encontrado")
-                return jsonify({'error': f"Polo com nome {data['polo_name']} não encontrado"}), 400
+                error_msg = f"Polo com nome {data['polo_name']} não encontrado"
+                print(error_msg)
+                return jsonify({'error': error_msg}), 400
             polo_id = polo[0]['id']
             print(f"Polo ID encontrado: {polo_id}")
+
+            # Validação adicional
+            if not isinstance(data['grades'], list):
+                error_msg = "Faixa etária deve ser uma lista"
+                print(error_msg)
+                return jsonify({'error': error_msg}), 400
+            if data['day'] not in ['seg', 'ter', 'qua', 'qui', 'sex']:
+                error_msg = f"Dia da semana inválido: {data['day']}"
+                print(error_msg)
+                return jsonify({'error': error_msg}), 400
+            if data['period'] not in ['manha', 'tarde']:
+                error_msg = f"Período inválido: {data['period']}"
+                print(error_msg)
+                return jsonify({'error': error_msg}), 400
+            try:
+                capacity = int(data['capacity'])
+                if capacity < 0:
+                    error_msg = "Capacidade deve ser um número não negativo"
+                    print(error_msg)
+                    return jsonify({'error': error_msg}), 400
+            except (ValueError, TypeError):
+                error_msg = "Capacidade deve ser um número válido"
+                print(error_msg)
+                return jsonify({'error': error_msg}), 400
 
             turma_data = {
                 'nome': data['name'],
@@ -1449,11 +1497,16 @@ def get_turmas():
                 'faixa_etaria': data['grades'],
                 'dia_semana': data['day'],
                 'periodo': data['period'],
-                'capacidade': int(data['capacity']),
+                'capacidade': capacity,
                 'polo_id': polo_id
             }
             print(f"Dados para inserção no Supabase: {turma_data}")
-            turma = supabase.table('turmas').insert(turma_data).execute().data[0]
+            response = supabase.table('turmas').insert(turma_data).execute()
+            if not response.data:
+                error_msg = "Falha ao inserir turma no banco de dados"
+                print(error_msg)
+                return jsonify({'error': error_msg}), 500
+            turma = response.data[0]
             print(f"Turma criada com sucesso: {turma}")
 
             log_action(
@@ -1967,6 +2020,276 @@ def busca_ativa():
             return jsonify({'message': 'Relatório criado com sucesso'})
     except Exception as e:
         return jsonify({'error': str(e)}), 500
+    
+@app.route('/api/salas', methods=['GET', 'POST'])
+def manage_salas():
+    user = get_current_user()
+    if not user:
+        print("Erro: Usuário não autenticado em /api/salas")
+        return jsonify({'error': 'Não autorizado'}), 401
+
+    if request.method == 'GET':
+        cache_key = f"salas:{user['id']}:{user['cargo']}"
+        cached_data = redis_client.get(cache_key)
+        if cached_data:
+            print(f"Cache hit para salas: {cache_key}, tamanho: {len(cached_data)} bytes")
+            return jsonify(json.loads(cached_data))
+
+        try:
+            query = supabase.table('salas').select(
+                'id, nome, capacidade, turmas_vinculadas, polo_id, polos!fk_polo_id(nome)'
+            )
+
+            if user['cargo'] in ['admin', 'secretaria']:
+                print(f"Usuário {user['id']} ({user['cargo']}) buscando todas as salas")
+                salas = execute_supabase_query(query)
+            else:
+                if not user.get('polo_id'):
+                    print(f"Erro: Usuário {user['id']} ({user['cargo']}) sem polo_id para salas")
+                    return jsonify({'error': 'Usuário não tem polo associado'}), 400
+                print(f"Usuário {user['id']} ({user['cargo']}) buscando salas do polo {user['polo_id']}")
+                salas = execute_supabase_query(query.eq('polo_id', user['polo_id']))
+
+            print(f"Total de salas encontradas: {len(salas)}")
+            result = []
+            turma_ids = set()
+            for sala in salas:
+                if sala.get('turmas_vinculadas') and isinstance(sala['turmas_vinculadas'], list):
+                    turma_ids.update(sala['turmas_vinculadas'])
+
+            turmas_dict = {}
+            if turma_ids:
+                turmas_query = supabase.table('turmas').select(
+                    'id, nome, disciplina_id, disciplinas!turmas_disciplina_id_fkey(tipo), faixa_etaria, dia_semana, periodo, polos!turmas_polo_id_fkey(nome)'
+                ).in_('id', list(turma_ids))
+                turmas = execute_supabase_query(turmas_query)
+                for turma in turmas:
+                    turmas_dict[turma['id']] = {
+                        'id': turma['id'],
+                        'nome': turma['nome'],
+                        'tipo': turma['disciplinas']['tipo'] if turma.get('disciplinas') else 'Desconhecido',
+                        'faixa_etaria': turma['faixa_etaria'] or [],
+                        'dia_semana': turma['dia_semana'] or 'Não especificado',
+                        'periodo': turma['periodo'] or 'Não especificado',
+                        'polo_nome': turma['polos']['nome'] if turma.get('polos') and turma['polos'].get('nome') else 'Não especificado'
+                    }
+                print(f"Turmas resolvidas: {len(turmas_dict)} turmas para {len(turma_ids)} UUIDs")
+
+            for sala in salas:
+                try:
+                    polo_name = sala['polos']['nome'] if sala.get('polos') and sala['polos'].get('nome') else 'Não especificado'
+                    turmas_vinculadas = []
+                    if sala.get('turmas_vinculadas') and isinstance(sala['turmas_vinculadas'], list):
+                        turmas_vinculadas = [turmas_dict[turma_id] for turma_id in sala['turmas_vinculadas'] if turma_id in turmas_dict]
+                    print(f"Sala {sala['id']}: {len(turmas_vinculadas)} turmas vinculadas")
+                    result.append({
+                        'id': sala['id'],
+                        'nome': sala['nome'],
+                        'capacidade': sala['capacidade'],
+                        'turmas_vinculadas': turmas_vinculadas,
+                        'polo_nome': polo_name
+                    })
+                except Exception as e:
+                    print(f"Erro ao processar sala {sala.get('id', 'desconhecida')}: {str(e)}")
+                    continue
+
+            redis_client.setex(cache_key, 300, json.dumps(result))
+            print(f"Dados armazenados no cache: {cache_key}, {len(result)} salas")
+            return jsonify(result)
+        except Exception as e:
+            print(f"Erro em get_salas: {str(e)}")
+            import traceback
+            traceback.print_exc()
+            return jsonify({'error': f'Erro ao buscar salas: {str(e)}'}), 500
+
+    elif request.method == 'POST':
+        if user['cargo'] not in ['admin', 'secretaria']:
+            print("Erro: Usuário não tem permissão para criar salas")
+            return jsonify({'error': 'Proibido: Apenas admin ou secretaria podem criar salas'}), 403
+
+        data = request.json
+        print(f"Dados recebidos para criação de sala: {data}")
+        try:
+            required_fields = ['nome', 'capacidade', 'polo_name']
+            missing_fields = [field for field in required_fields if field not in data or data[field] is None or data[field] == '']
+            if missing_fields:
+                error_msg = f"Campos obrigatórios ausentes: {', '.join(missing_fields)}"
+                print(error_msg)
+                return jsonify({'error': error_msg}), 400
+
+            polo_query = supabase.table('polos').select('id').eq('nome', data['polo_name'])
+            polo = execute_supabase_query(polo_query)
+            if not polo:
+                error_msg = f"Polo com nome {data['polo_name']} não encontrado"
+                print(error_msg)
+                return jsonify({'error': error_msg}), 400
+            polo_id = polo[0]['id']
+            print(f"Polo ID encontrado: {polo_id}")
+
+            try:
+                capacidade = int(data['capacidade'])
+                if capacidade < 0:
+                    error_msg = "Capacidade deve ser um número não negativo"
+                    print(error_msg)
+                    return jsonify({'error': error_msg}), 400
+            except (ValueError, TypeError):
+                error_msg = "Capacidade deve ser um número válido"
+                print(error_msg)
+                return jsonify({'error': error_msg}), 400
+
+            sala_data = {
+                'nome': data['nome'],
+                'capacidade': capacidade,
+                'polo_id': polo_id
+            }
+            print(f"Dados para inserção no Supabase: {sala_data}")
+            response = supabase.table('salas').insert(sala_data).execute()
+            if not response.data:
+                error_msg = "Falha ao inserir sala no banco de dados"
+                print(error_msg)
+                return jsonify({'error': error_msg}), 500
+            sala = response.data[0]
+            print(f"Sala criada com sucesso: {sala}")
+
+            log_action(
+                user_id=user['id'],
+                action_type='CREATE',
+                entity_type='SALA',
+                entity_id=sala['id'],
+                details={
+                    'nome': sala['nome'],
+                    'capacidade': sala['capacidade'],
+                    'polo_nome': data['polo_name']
+                }
+            )
+
+            invalidate_salas_cache()
+
+            return jsonify({
+                'id': sala['id'],
+                'nome': sala['nome'],
+                'capacidade': sala['capacidade'],
+                'turmas_vinculadas': sala['turmas_vinculadas'] or [],
+                'polo_nome': data['polo_name']
+            })
+        except Exception as e:
+            print(f"Erro em criar sala (POST): {str(e)}")
+            return jsonify({'error': str(e)}), 500
+
+@app.route('/api/salas/<id>', methods=['PATCH', 'DELETE'])
+def manage_sala(id):
+    print(f"Requisição recebida para /api/salas/{id} com método {request.method}")
+    user = get_current_user()
+    if not user:
+        print("Erro: Usuário não autenticado em /api/salas/<id>")
+        return jsonify({'error': 'Não autorizado'}), 401
+
+    if not id or id == 'undefined':
+        print("Erro: ID da sala inválido ou não fornecido")
+        return jsonify({'error': 'ID da sala inválido'}), 400
+
+    if request.method == 'PATCH':
+        if user['cargo'] not in ['admin', 'secretaria']:
+            print("Erro: Usuário não tem permissão para atualizar salas")
+            return jsonify({'error': 'Proibido: Apenas admin ou secretaria podem atualizar salas'}), 403
+
+        try:
+            data = request.json
+            print(f"Dados recebidos para atualização: {data}")
+
+            old_data = execute_supabase_query(
+                supabase.table('salas')
+                .select('nome, capacidade, polos!fk_polo_id(nome)')
+                .eq('id', id)
+                .single()
+            )
+
+            update_data = {
+                'nome': data.get('nome'),
+                'capacidade': int(data.get('capacidade'))
+            }
+
+            if data.get('polo_name'):
+                polo_query = supabase.table('polos').select('id').eq('nome', data['polo_name'])
+                polo = execute_supabase_query(polo_query)
+                if not polo:
+                    error_msg = f"Polo com nome {data['polo_name']} não encontrado"
+                    print(error_msg)
+                    return jsonify({'error': error_msg}), 400
+                update_data['polo_id'] = polo[0]['id']
+
+            update_data = {k: v for k, v in update_data.items() if v is not None}
+            print(f"Dados para atualização no Supabase: {update_data}")
+
+            response = supabase.table('salas').update(update_data).eq('id', id).execute()
+            if not response.data:
+                print(f"Sala com ID {id} não encontrada no Supabase")
+                return jsonify({'error': 'Sala não encontrada'}), 404
+
+            log_action(
+                user_id=user['id'],
+                action_type='UPDATE',
+                entity_type='SALA',
+                entity_id=id,
+                details={
+                    'old_data': {
+                        'nome': old_data['nome'],
+                        'capacidade': old_data['capacidade'],
+                        'polo_nome': old_data['polos']['nome'] if old_data.get('polos') else 'Não especificado'
+                    },
+                    'new_data': {
+                        'nome': update_data.get('nome', old_data['nome']),
+                        'capacidade': update_data.get('capacidade', old_data['capacidade']),
+                        'polo_nome': data.get('polo_name', old_data['polos']['nome'] if old_data.get('polos') else 'Não especificado')
+                    }
+                }
+            )
+
+            invalidate_salas_cache()
+
+            print(f"Sala com ID {id} atualizada com sucesso")
+            return jsonify({'message': 'Sala atualizada com sucesso'})
+        except Exception as e:
+            print(f"Erro em update_sala: {str(e)}")
+            return jsonify({'error': str(e)}), 500
+
+    elif request.method == 'DELETE':
+        if user['cargo'] not in ['admin', 'secretaria']:
+            print("Erro: Usuário não tem permissão para excluir salas")
+            return jsonify({'error': 'Proibido: Apenas admin ou secretaria podem excluir salas'}), 403
+
+        try:
+            sala = execute_supabase_query(
+                supabase.table('salas')
+                .select('id, nome, polos!fk_polo_id(nome)')
+                .eq('id', id)
+                .single()
+            )
+
+            if not sala:
+                print(f"Sala com ID {id} não encontrada")
+                return jsonify({'error': 'Sala não encontrada'}), 404
+
+            response = supabase.table('salas').delete().eq('id', id).execute()
+
+            log_action(
+                user_id=user['id'],
+                action_type='DELETE',
+                entity_type='SALA',
+                entity_id=id,
+                details={
+                    'nome': sala['nome'],
+                    'polo_nome': sala['polos']['nome'] if sala.get('polos') else 'Não especificado'
+                }
+            )
+
+            invalidate_salas_cache()
+
+            print(f"Sala com ID {id} excluída com sucesso")
+            return jsonify({'message': 'Sala excluída com sucesso'})
+        except Exception as e:
+            print(f"Erro em delete_sala: {str(e)}")
+            return jsonify({'error': str(e)}), 500
 
 @app.route('/api/dashboard_data', methods=['GET'])
 def get_dashboard_data():
@@ -2085,6 +2408,11 @@ def get_dashboard_data():
             batch_query = query.range(start, end)
             batch_alunos = execute_supabase_query(batch_query)
             alunos.extend(batch_alunos)
+
+        # Adicionar log para verificar os valores de pcd retornados
+        print("Valores de pcd retornados para os alunos (primeiros 10):")
+        for aluno in alunos[:10]:
+            print(f"Aluno: {aluno['nome']}, pcd: {aluno['pcd']}, tipo: {type(aluno['pcd'])}")
 
         # Filtrar alunos por unidades do polo apenas se apply_unit_filter for True
         alunos_filtrados = alunos

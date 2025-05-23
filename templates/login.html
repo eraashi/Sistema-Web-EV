@@ -4,78 +4,79 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Login - Escola Viva</title>
+    <link rel="icon" type="image/png" href="/static/src/icone navegador.png">
     <script src="https://cdn.tailwindcss.com"></script>
     <script src="https://unpkg.com/lucide@latest"></script>
     <link href="/static/css/styles.css" rel="stylesheet">
 </head>
-<body class="bg-white min-h-screen flex flex-col">
+<body class="min-h-screen flex flex-col bg-login overflow-hidden">
     <!-- Contêiner Principal -->
-    <div class="flex flex-col lg:flex-row items-stretch h-[calc(100vh-60px)]">
-        <!-- Seção de Texto à Esquerda -->
-        <div class="w-full lg:w-1/2 p-8 lg:pl-96 lg:p-8 flex flex-col justify-center">
-            <!-- Espaço Reservado para Imagem (Logotipo) -->
-            <div class="w-80 h-40 mb-2">
-                <img src="/static/src/logo media.png" alt="Logotipo" class="w-full h-full object-contain">
-            </div>
+    <div class="flex flex-col lg:flex-row">
+        <!-- Div Branca à Esquerda -->
+        <div class="w-full lg:w-1/2 bg-white flex flex-col justify-center h-screen p-8 lg:p-12">
+            <div class="max-w-xs ml-auto mr-32 lg:mr-40">
+                <!-- Logotipo -->
+                <div class="w-80 h-40 mb-4">
+                    <img src="/static/src/logo media.png" alt="Logotipo" class="w-full h-full object-contain">
+                </div>
 
-            <!-- Saudação -->
-            <p class="text-4xl font-bold text-gray-900 mt-2 mb-2">Olá,</p>
+                <!-- Saudação -->
+                <p class="text-4xl font-bold text-gray-900 mb-2 text-left">Olá,</p>
 
-            <!-- Instruções -->
-            <p class="text-base text-gray-600 mb-4">Preencha abaixo para acessar.</p>
+                <!-- Instruções -->
+                <p class="text-base text-gray-600 mb-6 text-left">Preencha abaixo para acessar.</p>
 
-            <!-- Formulário de Login -->
-            <form id="login-form" class="w-full max-w-xs space-y-4">
-                <!-- Campo CPF -->
-                <div>
-                    <label for="cpf" class="block text-sm font-medium text-gray-700 mb-1">CPF</label>
-                    <div class="relative">
-                        <div class="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none">
-                            <svg class="h-5 w-5 text-gray-400" fill="none" stroke="currentColor" viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg">
-                                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M16 7a4 4 0 11-8 0 4 4 0 018 0zM12 14a7 7 0 00-7 7h14a7 7 0 00-7-7z"></path>
-                            </svg>
+                <!-- Formulário de Login -->
+                <form id="login-form" class="w-full space-y-4">
+                    <!-- Campo CPF -->
+                    <div>
+                        <label for="cpf" class="block text-sm font-medium text-gray-700 mb-1">CPF</label>
+                        <div class="relative">
+                            <div class="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none">
+                                <svg class="h-5 w-5 text-gray-400" fill="none" stroke="currentColor" viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg">
+                                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M16 7a4 4 0 11-8 0 4 4 0 018 0zM12 14a7 7 0 00-7 7h14a7 7 0 00-7-7z"></path>
+                                </svg>
+                            </div>
+                            <input type="text" id="cpf" name="cpf" class="pl-10 block w-full px-3 py-2 border border-gray-300 rounded-md shadow-sm focus:outline-none focus:ring-blue-500 focus:border-blue-500" required placeholder="Digite seu CPF" maxlength="14">
                         </div>
-                        <input type="text" id="cpf" name="cpf" class="pl-10 block w-full px-3 py-2 border border-gray-300 rounded-md shadow-sm focus:outline-none focus:ring-blue-500 focus:border-blue-500" required placeholder="Digite seu CPF" maxlength="14">
                     </div>
-                </div>
 
-                <!-- Campo Senha -->
-                <div>
-                    <label for="password" class="block text-sm font-medium text-gray-700 mb-1">Senha</label>
-                    <div class="relative">
-                        <div class="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none">
-                            <i data-lucide="lock" class="h-5 w-5 text-gray-400"></i>
+                    <!-- Campo Senha -->
+                    <div>
+                        <label for="password" class="block text-sm font-medium text-gray-700 mb-1">Senha</label>
+                        <div class="relative">
+                            <div class="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none">
+                                <i data-lucide="lock" class="h-5 w-5 text-gray-400"></i>
+                            </div>
+                            <input type="password" id="password" name="password" class="pl-10 block w-full px-3 py-2 border border-gray-300 rounded-md shadow-sm focus:outline-none focus:ring-blue-500 focus:border-blue-500" required placeholder="Digite sua senha">
                         </div>
-                        <input type="password" id="password" name="password" class="pl-10 block w-full px-3 py-2 border border-gray-300 rounded-md shadow-sm focus:outline-none focus:ring-blue-500 focus:border-blue-500" required placeholder="Digite sua senha">
                     </div>
+
+                    <!-- Contêiner para Mensagem de Erro -->
+                    <div id="error-message" class="space-y-4"></div>
+
+                    <!-- Botão Entrar -->
+                    <div>
+                        <button type="submit" id="login-button" class="w-full bg-blue-600 text-white px-4 py-3 rounded-md hover:bg-blue-700 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:ring-opacity-50 transition-colors duration-300 text-lg font-semibold flex items-center justify-center space-x-2">
+                            <span id="button-text">Entrar</span>
+                            <i id="loading-spinner" data-lucide="loader" class="hidden h-5 w-5 text-white"></i>
+                        </button>
+                    </div>
+                </form>
+
+                <!-- Link "Esqueci minha senha" -->
+                <div class="mt-4 text-left">
+                    <a href="#" class="text-sm text-gray-400 underline pointer-events-none cursor-not-allowed">Esqueci minha senha</a>
                 </div>
-
-                <!-- Contêiner para Mensagem de Erro -->
-                <div id="error-message" class="space-y-4"></div>
-
-                <!-- Botão Entrar -->
-                <div>
-                    <button type="submit" id="login-button" class="w-full bg-blue-600 text-white px-4 py-3 rounded-md hover:bg-blue-700 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:ring-opacity-50 transition-colors duration-300 text-lg font-semibold flex items-center justify-center space-x-2">
-                        <span id="button-text">Entrar</span>
-                        <i id="loading-spinner" data-lucide="loader" class="hidden h-5 w-5 text-white"></i>
-                    </button>
-                </div>
-            </form>
-
-            <!-- Link "Esqueci minha senha" (Desabilitado) -->
-            <div class="mt-4">
-                <a href="#" class="text-sm text-gray-400 underline pointer-events-none cursor-not-allowed">Esqueci minha senha</a>
             </div>
         </div>
 
-        <!-- Imagem à Direita -->
-        <div class="w-full lg:w-1/2 h-[calc(50vh-60px)] lg:h-[calc(100vh-60px)] pr-0">
-            <img src="/static/src/escola viva login.png" alt="Imagem de Login" class="w-full h-full object-contain">
-        </div>
+        <!-- Metade Direita (apenas fundo) -->
+        <div class="hidden lg:block w-1/2 h-screen"></div>
     </div>
 
-    <!-- Rodapé com Link de Ajuda (Desabilitado) -->
-    <div class="bg-blue-100 py-4 px-8 flex justify-center lg:justify-start h-[60px]">
+    <!-- Rodapé -->
+    <div class="fixed bottom-0 left-0 w-full bg-blue-100 py-4 px-8 flex justify-center lg:justify-start z-10">
         <div class="flex items-center space-x-2">
             <svg class="h-5 w-5 text-gray-400" fill="none" stroke="currentColor" viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg">
                 <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M8.228 9c.549-1.165 2.03-2 3.772-2 2.21 0 4 1.343 4 3 0 1.4-1.278 2.575-3.006 2.907-.542.104-.994.54-.994 1.093m0 3h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z"></path>
@@ -235,7 +236,7 @@
                     loadingSpinner.classList.remove('hidden');
                     loadingSpinner.classList.add('animate-spin');
 
-                    // Garantir que os ícones sejam renderizados (usar setTimeout para aguardar atualização do DOM)
+                    // Garantir que os ícones sejam renderizados
                     setTimeout(() => {
                         lucide.createIcons();
                     }, 10);
@@ -276,17 +277,13 @@
 
         // Inicializar ícones e redefinir o botão ao carregar a página
         document.addEventListener('DOMContentLoaded', () => {
-            // Inicializar ícones estáticos (como o do cadeado)
             lucide.createIcons();
-
-            // Redefinir o estado do botão
             resetButtonState();
         });
 
-        // Redefinir o botão ao voltar para a página (lidar com cache do navegador)
+        // Redefinir o botão ao voltar para a página
         window.addEventListener('pageshow', (event) => {
             if (event.persisted) {
-                // A página foi restaurada do cache do navegador (ex.: ao clicar em "voltar")
                 resetButtonState();
                 lucide.createIcons();
             }

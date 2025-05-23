@@ -59,8 +59,14 @@
                     <input type="text" id="edit-name" name="name" class="modal-input" required>
                 </div>
                 <div class="modal-field">
-                    <label for="edit-polo-name" class="modal-label">Polo</label>
-                    <input type="text" id="edit-polo-name" name="polo_name" class="modal-input" readonly value="{{ user.polos.nome }}">
+                    <label for="{% if user.cargo in ['admin', 'secretaria'] %}edit-polo-select{% else %}edit-polo-name{% endif %}" class="modal-label">Polo</label>
+                    {% if user.cargo in ['admin', 'secretaria'] %}
+                        <select id="edit-polo-select" name="polo_name" class="modal-input">
+                            <!-- Opções serão preenchidas dinamicamente via JavaScript -->
+                        </select>
+                    {% else %}
+                        <input type="text" id="edit-polo-name" name="polo_name" class="modal-input" readonly value="{{ user.polos.nome }}">
+                    {% endif %}
                 </div>
                 <div class="modal-field">
                     <label for="edit-type" class="modal-label">Tipo</label>
@@ -179,8 +185,15 @@
                 <div class="modal-field-with-icon flex items-center mb-4">
                     <i data-lucide="school" class="h-5 w-5 mr-2 icon-align"></i>
                     <div class="field-container">
-                        <label for="create-polo-name" class="modal-label">Polo</label>
-                        <input type="text" id="create-polo-name" name="polo_name" class="modal-input modal-input-narrow" readonly value="{{ user.polos.nome }}">
+                        <label for="{% if user.cargo in ['admin', 'secretaria'] %}create-polo-select{% else %}create-polo-name{% endif %}" class="modal-label">Polo</label>
+                        {% if user.cargo in ['admin', 'secretaria'] %}
+                            <select id="create-polo-select" name="polo_name" class="modal-input modal-input-narrow" required>
+                                <option value="" disabled selected hidden>Escolha um polo...</option>
+                                <!-- Opções serão preenchidas dinamicamente via JavaScript -->
+                            </select>
+                        {% else %}
+                            <input type="text" id="create-polo-name" name="polo_name" class="modal-input modal-input-narrow" readonly value="{{ user.polos.nome }}">
+                        {% endif %}
                         <div class="tooltip" id="tooltip-polo-name"></div>
                     </div>
                 </div>
